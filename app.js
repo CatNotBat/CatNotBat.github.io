@@ -10,7 +10,7 @@ switcher.addEventListener('click', function(){
         this.textContent = "Dark";
     }
     else{
-        this.textContent = "Light";
+        this.textContent = "Dark";
         
     }
 
