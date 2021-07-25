@@ -19,10 +19,9 @@ ul {
 
 li {
     list-style: circle;
-}
-
-.list {
-    list-style: square;
+    
+    font-family: "Lucida Console", monospace;
+    
 }
 
 
