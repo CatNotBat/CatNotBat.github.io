@@ -29,7 +29,14 @@ ul {
   grid-gap: 1rem;
   font-family: helvetica;
 }
-
+li {
+  display: grid;
+  grid-template-columns: 0 1fr;
+  grid-gap: 1.75em;
+  align-items: start;
+  font-size: 1.5rem;
+  line-height: 1.25;
+}
 .dark-theme {
     --bg: var(--black);
     --fontColor: var(--green);
