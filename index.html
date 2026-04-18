@@ -1,36 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
-    
-    <head>
-        <meta charset="UTF-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Butter</title> <link rel="stylesheet" href="main.css">
-        <style>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lev</title>
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
 
-        </style>
-    </head>
-    <body class="dark-theme">
-        
-        
-        <h1>Levlevon</h1>
-        
-        <ul role="list">
-             <li>@levkeret</li>
-             <li>levkeretyt</li>
-        </ul>
+  <div class="wrap">
 
-        
-       
+    <header>
+      <h1>lev</h1>
+      <p class="sub">firmware // security // systems</p>
+      <nav>
+        <a href="https://github.com/CatNotBat">github</a>
+      </nav>
+    </header>
 
-        
-        
-        
-        <script src="app.js"></script>
-        <noscript>You to need to enable JavaScrip to view the full site.</noscript>
-        
-        
-        
+    <section>
+      <h2>what i do</h2>
+      <p>
+        I write code that talks to hardware, breaks into routers, and moves
+        messages where they're not supposed to go. Mostly Rust, C, TypeScript,
+        Python, Kotlin. I pick whatever fits.
+      </p>
+    </section>
 
-    </body>
+    <section id="projects">
+      <h2>projects</h2>
+
+      <div class="grid">
+
+        <a class="card" href="https://github.com/CatNotBat/ai-pentest-suite">
+          <h3>ai-pentest-suite</h3>
+          <p>
+            Autonomous IoT pentest agent. Claude runs in a Kali container with
+            MCP servers for nmap, john, UART, searchsploit, CVE lookup.
+            Found 30+ vulns on two routers including pre-auth RCE, heap
+            overflows, and UART root shells. Runs unattended across sessions
+            with persistent state.
+          </p>
+          <div class="tags">
+            <span>python</span><span>docker</span><span>mcp</span><span>uart</span><span>claude</span>
+          </div>
+        </a>
+
+        <a class="card" href="https://github.com/CatNotBat/whatsapp-masquerade">
+          <h3>whatsapp-masquerade</h3>
+          <p>
+            WhatsApp relay daemon. Lets someone send/receive on a specific chat
+            as you, using a WhatsApp group as the interface. Bidirectional relay
+            with loop guard, audit log, and localhost admin UI. The other person
+            never knows.
+          </p>
+          <div class="tags">
+            <span>typescript</span><span>baileys</span><span>sqlite</span><span>docker</span>
+          </div>
+        </a>
+
+        <a class="card" href="https://github.com/CatNotBat/esp32-wg-client">
+          <h3>esp32-wg-client</h3>
+          <p>
+            WireGuard VPN client for ESP32 (Xtensa LX6), in Rust.
+            Bare-metal crypto on a microcontroller with 4MB flash.
+          </p>
+          <div class="tags">
+            <span>rust</span><span>esp32</span><span>wireguard</span><span>embedded</span>
+          </div>
+        </a>
+
+        <a class="card" href="https://github.com/CatNotBat/cellular-location">
+          <h3>cellular-location</h3>
+          <p>
+            Android app that locates you using cell towers only &mdash; no GPS.
+            Reads CID, LAC, MCC, MNC, signal strength and queries OpenCellID /
+            Mozilla Location Services. Offline fallback via local DB. Built for
+            a rooted Pixel 6a.
+          </p>
+          <div class="tags">
+            <span>kotlin</span><span>compose</span><span>android</span>
+          </div>
+        </a>
+
+        <a class="card" href="https://github.com/CatNotBat/DNS-client">
+          <h3>DNS-client</h3>
+          <p>
+            DNS resolver from scratch in C. Builds raw query packets, fires
+            them over UDP, parses the response. A and AAAA records.
+          </p>
+          <div class="tags">
+            <span>c</span><span>udp</span><span>dns</span>
+          </div>
+        </a>
+
+        <a class="card" href="https://github.com/CatNotBat/thug-ring">
+          <h3>thug-ring</h3>
+          <p>
+            Decentralized P2P messaging ring over UDP. Nodes discover their
+            public endpoints, punch through NAT, and relay packets with
+            TTL routing. No server.
+          </p>
+          <div class="tags">
+            <span>python</span><span>udp</span><span>nat-traversal</span><span>p2p</span>
+          </div>
+        </a>
+
+        <a class="card" href="https://github.com/CatNotBat/plane-detection-algorithms-sandbox">
+          <h3>plane-detection-sandbox</h3>
+          <p>
+            RANSAC vs SVD vs weighted SVD vs IRLS for fitting planes to noisy
+            3D point clouds. Comparing robustness to outliers.
+          </p>
+          <div class="tags">
+            <span>python</span><span>numpy</span><span>ransac</span>
+          </div>
+        </a>
+
+        <a class="card" href="https://github.com/CatNotBat/picking-homework">
+          <h3>picking-homework</h3>
+          <p>
+            STA/LTA seismic phase picking. Detects P-wave arrivals in
+            seismograph data using short/long-term average ratios.
+          </p>
+          <div class="tags">
+            <span>python</span><span>signal-processing</span><span>seismology</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <footer>
+      <p>no frameworks. no build step. just files.</p>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
 </html>
