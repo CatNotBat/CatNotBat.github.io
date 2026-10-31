@@ -5,122 +5,117 @@
 }
 
 :root {
-  --bg: #0a0a0a;
-  --fg: #c8c8c8;
-  --dim: #555;
-  --accent: #00cc66;
-  --card-bg: #111;
-  --card-border: #1a1a1a;
-  --card-hover: #181818;
-  --tag-bg: #1a1a1a;
-  --tag-fg: #888;
+  --bg: #0d0f12;
+  --fg: #d6d9de;
+  --muted: #9aa0a8;
+  --dim: #6b7178;
+  --accent: #5db98b;
+  --card-bg: #15181d;
+  --card-border: #23272e;
+  --card-hover: #1b1f25;
+  --tag-bg: #21252c;
+  --tag-fg: #9aa0a8;
 }
 
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-  font-size: 15px;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
 .wrap {
-  max-width: 860px;
+  max-width: 920px;
   margin: 0 auto;
-  padding: 60px 24px 40px;
+  padding: 72px 24px 64px;
 }
 
 /* header */
 
 header {
-  margin-bottom: 60px;
+  margin-bottom: 56px;
 }
 
 h1 {
-  font-size: 2.4rem;
+  font-size: 2.6rem;
   font-weight: 700;
   color: #fff;
   letter-spacing: -1px;
 }
 
 .sub {
-  color: var(--dim);
-  margin-top: 4px;
+  color: var(--muted);
+  margin-top: 6px;
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, monospace;
   font-size: 0.9rem;
+  letter-spacing: 0.3px;
 }
 
 nav {
-  margin-top: 16px;
+  margin-top: 18px;
 }
 
 nav a {
   color: var(--accent);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
 }
 
 nav a:hover {
-  text-decoration: underline;
+  border-color: var(--accent);
 }
 
-/* sections */
+/* projects */
 
-section {
-  margin-bottom: 56px;
-}
-
-h2 {
-  font-size: 1rem;
+main h2 {
+  font-size: 0.8rem;
   font-weight: 600;
-  color: var(--accent);
-  text-transform: lowercase;
-  margin-bottom: 16px;
-  letter-spacing: 1px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
 }
-
-section > p {
-  max-width: 600px;
-  color: var(--fg);
-}
-
-/* project grid */
 
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 18px;
 }
 
 .card {
   display: block;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 6px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 22px;
   text-decoration: none;
   color: var(--fg);
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 
 .card:hover {
   background: var(--card-hover);
   border-color: var(--accent);
+  transform: translateY(-2px);
 }
 
 .card h3 {
-  font-size: 1rem;
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.98rem;
   font-weight: 600;
   color: #fff;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .card p {
-  font-size: 0.82rem;
-  color: var(--dim);
-  line-height: 1.5;
-  margin-bottom: 12px;
-  font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 16px;
 }
 
 .tags {
@@ -130,36 +125,24 @@ section > p {
 }
 
 .tags span {
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, monospace;
   font-size: 0.7rem;
-  padding: 2px 8px;
+  padding: 3px 9px;
   background: var(--tag-bg);
   color: var(--tag-fg);
-  border-radius: 3px;
-}
-
-/* footer */
-
-footer {
-  border-top: 1px solid var(--card-border);
-  padding-top: 24px;
-  margin-top: 40px;
-}
-
-footer p {
-  color: var(--dim);
-  font-size: 0.78rem;
+  border-radius: 4px;
 }
 
 /* mobile */
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
+  .wrap {
+    padding: 44px 18px 40px;
+  }
   .grid {
     grid-template-columns: 1fr;
   }
   h1 {
-    font-size: 1.8rem;
-  }
-  .wrap {
-    padding: 32px 16px 24px;
+    font-size: 2rem;
   }
 }
