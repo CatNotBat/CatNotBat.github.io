@@ -32,6 +32,18 @@
 
       <div class="grid">
 
+        <a class="card" href="https://github.com/CatNotBat/harmonium">
+          <h3>harmonium</h3>
+          <p>
+            End-to-end encrypted voice over an ordinary Discord call. Codec 2,
+            then WireGuard, then an OFDM audio modem: Discord only ever carries
+            modem noise. Works live between Linux and Windows.
+          </p>
+          <div class="tags">
+            <span>rust</span><span>wireguard</span><span>dsp</span><span>ofdm</span>
+          </div>
+        </a>
+
         <a class="card" href="https://github.com/CatNotBat/ai-pentest-suite">
           <h3>ai-pentest-suite</h3>
           <p>
@@ -46,19 +58,6 @@
           </div>
         </a>
 
-        <a class="card" href="https://github.com/CatNotBat/whatsapp-masquerade">
-          <h3>whatsapp-masquerade</h3>
-          <p>
-            WhatsApp relay daemon. Lets someone send/receive on a specific chat
-            as you, using a WhatsApp group as the interface. Bidirectional relay
-            with loop guard, audit log, and localhost admin UI. The other person
-            never knows.
-          </p>
-          <div class="tags">
-            <span>typescript</span><span>baileys</span><span>sqlite</span><span>docker</span>
-          </div>
-        </a>
-
         <a class="card" href="https://github.com/CatNotBat/esp32-wg-client">
           <h3>esp32-wg-client</h3>
           <p>
@@ -67,19 +66,6 @@
           </p>
           <div class="tags">
             <span>rust</span><span>esp32</span><span>wireguard</span><span>embedded</span>
-          </div>
-        </a>
-
-        <a class="card" href="https://github.com/CatNotBat/cellular-location">
-          <h3>cellular-location</h3>
-          <p>
-            Android app that locates you using cell towers only &mdash; no GPS.
-            Reads CID, LAC, MCC, MNC, signal strength and queries OpenCellID /
-            Mozilla Location Services. Offline fallback via local DB. Built for
-            a rooted Pixel 6a.
-          </p>
-          <div class="tags">
-            <span>kotlin</span><span>compose</span><span>android</span>
           </div>
         </a>
 
@@ -97,9 +83,9 @@
         <a class="card" href="https://github.com/CatNotBat/thug-ring">
           <h3>thug-ring</h3>
           <p>
-            Decentralized P2P messaging ring over UDP. Nodes discover their
-            public endpoints, punch through NAT, and relay packets with
-            TTL routing. No server.
+            A workshop I built for my team on UDP hole punching: nodes
+            discover their public endpoints, punch through NAT and pass
+            messages around a ring with TTL routing. No server.
           </p>
           <div class="tags">
             <span>python</span><span>udp</span><span>nat-traversal</span><span>p2p</span>
@@ -137,6 +123,5 @@
 
   </div>
 
-  <script src="app.js"></script>
 </body>
 </html>
