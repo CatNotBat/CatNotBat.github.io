@@ -3,135 +3,148 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>lev</title>
+  <title>Lev</title>
+  <meta name="description" content="Lev — network R&D, embedded systems and security. Selected work.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="main.css">
 </head>
 <body>
 
   <div class="wrap">
 
-    <header>
-      <h1>lev</h1>
-      <p class="sub">Network R&amp;D &middot; C &middot; C++ &middot; Python &middot; Rust &middot; ROS2</p>
-      <nav>
-        <a href="https://github.com/CatNotBat">github</a>
-      </nav>
+    <header class="masthead">
+      <div class="intro">
+        <p class="kicker">Network R&amp;D · Embedded · Security</p>
+        <h1>Lev</h1>
+        <p class="bio">
+          I build low in the stack — radios, protocols, microcontrollers —
+          and push them until they do something they weren&rsquo;t meant to.
+          C, C++, Rust, Python, ROS2.
+        </p>
+        <nav>
+          <a href="https://github.com/CatNotBat">github&nbsp;&rarr;</a>
+        </nav>
+      </div>
+
+      <figure class="plate">
+        <img src="assets/eye.png" alt="An eye, painted by Lev" loading="eager">
+        <figcaption>untitled — yes, I drew it</figcaption>
+      </figure>
     </header>
 
     <main>
-      <h2>projects</h2>
+      <p class="section-label">Selected work</p>
 
-      <div class="grid">
+      <ol class="index">
 
-        <a class="card" href="https://github.com/CatNotBat/harmonium">
-          <h3>harmonium</h3>
-          <p>
-            End-to-end encrypted voice over an ordinary Discord call. Codec 2,
-            then WireGuard, then an OFDM audio modem: Discord only ever carries
-            modem noise. Works live between Linux and Windows.
-          </p>
-          <div class="tags">
-            <span>rust</span><span>wireguard</span><span>dsp</span><span>ofdm</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/harmonium">
+            <span class="num">01</span>
+            <span class="body">
+              <span class="name">harmonium</span>
+              <span class="desc">Encrypted voice smuggled through an ordinary Discord call — Codec&nbsp;2, WireGuard, then a homemade OFDM audio modem. Discord only ever hears modem noise.</span>
+            </span>
+            <span class="stack">rust · dsp · wireguard</span>
+          </a>
+        </li>
 
-        <a class="card" href="https://github.com/CatNotBat/roomsense">
-          <h3>roomsense</h3>
-          <p>
-            Privacy-first room occupancy from BLE + mmWave radar fusion. Counts
-            people and device types &mdash; never identities. Four $70 ESP32
-            nodes, environment-level features that survive MAC rotation, 93.8%
-            cross-validated accuracy.
-          </p>
-          <div class="tags">
-            <span>python</span><span>esp32</span><span>ml</span><span>ble</span><span>radar</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/roomsense">
+            <span class="num">02</span>
+            <span class="body">
+              <span class="name">roomsense</span>
+              <span class="desc">Room occupancy from BLE + mmWave radar fusion. Counts people and device types, never identities. Four $70 ESP32 nodes, 93.8% cross-validated.</span>
+            </span>
+            <span class="stack">python · esp32 · ml</span>
+          </a>
+        </li>
 
-        <a class="card" href="https://github.com/CatNotBat/ai-pentest-suite">
-          <h3>ai-pentest-suite</h3>
-          <p>
-            Autonomous IoT pentest agent. Claude runs in a Kali container with
-            MCP servers for nmap, john, UART, searchsploit, CVE lookup.
-            Found 30+ vulns on two routers including pre-auth RCE, heap
-            overflows, and UART root shells. Runs unattended across sessions
-            with persistent state.
-          </p>
-          <div class="tags">
-            <span>python</span><span>docker</span><span>mcp</span><span>uart</span><span>claude</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/ai-pentest-suite">
+            <span class="num">03</span>
+            <span class="body">
+              <span class="name">ai-pentest-suite</span>
+              <span class="desc">Autonomous IoT pentest agent in a Kali container with MCP-wrapped tools. Found 30+ vulns on two routers — pre-auth RCE, heap overflows, UART root shells.</span>
+            </span>
+            <span class="stack">python · docker · mcp</span>
+          </a>
+        </li>
 
-        <a class="card" href="https://github.com/CatNotBat/esp32-wg-client">
-          <h3>esp32-wg-client</h3>
-          <p>
-            WireGuard VPN client for ESP32 (Xtensa LX6), in Rust.
-            Bare-metal crypto on a microcontroller with 4MB flash.
-          </p>
-          <div class="tags">
-            <span>rust</span><span>esp32</span><span>wireguard</span><span>embedded</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/esp32-wg-client">
+            <span class="num">04</span>
+            <span class="body">
+              <span class="name">esp32-wg-client</span>
+              <span class="desc">A WireGuard client for the ESP32, in Rust. Bare-metal crypto on a microcontroller with 4&nbsp;MB of flash.</span>
+            </span>
+            <span class="stack">rust · embedded</span>
+          </a>
+        </li>
 
-        <a class="card" href="https://github.com/CatNotBat/DNS-client">
-          <h3>DNS-client</h3>
-          <p>
-            DNS resolver from scratch in C. Builds raw query packets, fires
-            them over UDP, parses the response. A and AAAA records.
-          </p>
-          <div class="tags">
-            <span>c</span><span>udp</span><span>dns</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/DNS-client">
+            <span class="num">05</span>
+            <span class="body">
+              <span class="name">DNS-client</span>
+              <span class="desc">A DNS resolver written from scratch in C. Raw query packets over UDP, response parsed by hand. No libraries — just sockets and RFC&nbsp;1035.</span>
+            </span>
+            <span class="stack">c · udp</span>
+          </a>
+        </li>
 
-        <a class="card" href="https://github.com/CatNotBat/thug-ring">
-          <h3>thug-ring</h3>
-          <p>
-            A workshop I built for my team on UDP hole punching: nodes
-            discover their public endpoints, punch through NAT and pass
-            messages around a ring with TTL routing. No server.
-          </p>
-          <div class="tags">
-            <span>python</span><span>udp</span><span>nat-traversal</span><span>p2p</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/thug-ring">
+            <span class="num">06</span>
+            <span class="body">
+              <span class="name">thug-ring</span>
+              <span class="desc">A workshop I built for my team on UDP hole punching: nodes find their public endpoints, punch through NAT, and pass messages around a ring. No server.</span>
+            </span>
+            <span class="stack">python · nat-traversal</span>
+          </a>
+        </li>
 
-        <a class="card" href="https://github.com/CatNotBat/cellular-location">
-          <h3>cellular-location</h3>
-          <p>
-            Android app that locates you from cell towers, no GPS. Reads CID /
-            LAC / MCC / MNC, queries OpenCellID &amp; Mozilla, and trilaterates
-            from signal strength. Kotlin + Compose.
-          </p>
-          <div class="tags">
-            <span>kotlin</span><span>compose</span><span>android</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/cellular-location">
+            <span class="num">07</span>
+            <span class="body">
+              <span class="name">cellular-location</span>
+              <span class="desc">An Android app that locates you from cell towers, no GPS. Reads CID / LAC / MCC / MNC and trilaterates from signal strength.</span>
+            </span>
+            <span class="stack">kotlin · compose</span>
+          </a>
+        </li>
 
-        <a class="card" href="https://github.com/CatNotBat/plane-detection-algorithms-sandbox">
-          <h3>plane-detection-sandbox</h3>
-          <p>
-            RANSAC vs SVD vs weighted SVD vs IRLS for fitting planes to noisy
-            3D point clouds. Comparing robustness to outliers.
-          </p>
-          <div class="tags">
-            <span>python</span><span>numpy</span><span>ransac</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/plane-detection-algorithms-sandbox">
+            <span class="num">08</span>
+            <span class="body">
+              <span class="name">plane-detection-sandbox</span>
+              <span class="desc">RANSAC vs SVD vs weighted SVD vs IRLS for fitting planes to noisy 3D point clouds — a bench for how each one handles outliers on real LiDAR scans.</span>
+            </span>
+            <span class="stack">python · numpy</span>
+          </a>
+        </li>
 
-        <a class="card" href="https://github.com/CatNotBat/seismic-first-break-picking">
-          <h3>seismic-first-break-picking</h3>
-          <p>
-            STA/LTA seismic phase picking. Detects P-wave arrivals in
-            seismograph data using short/long-term average ratios.
-          </p>
-          <div class="tags">
-            <span>python</span><span>signal-processing</span><span>seismology</span>
-          </div>
-        </a>
+        <li class="row">
+          <a href="https://github.com/CatNotBat/seismic-first-break-picking">
+            <span class="num">09</span>
+            <span class="body">
+              <span class="name">seismic-first-break-picking</span>
+              <span class="desc">STA/LTA phase picking — detecting P-wave arrivals in seismograph traces with short/long-term average ratios.</span>
+            </span>
+            <span class="stack">python · signal-processing</span>
+          </a>
+        </li>
 
-      </div>
+      </ol>
     </main>
+
+    <footer>
+      <span>Lev</span>
+      <a href="https://github.com/CatNotBat">github.com/CatNotBat</a>
+    </footer>
 
   </div>
 
