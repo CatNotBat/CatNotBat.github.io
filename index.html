@@ -90,8 +90,7 @@
       <div class="ch-text">
         <p class="st-id"><span>24 GHz</span> occupancy</p>
         <h2 id="room-h" data-decode><a href="https://github.com/CatNotBat/roomsense" rel="noopener noreferrer">roomsense</a></h2>
-        <p>Count the people in a room without a camera, and without tracking anyone's phone. An ESP32 sits in each corner, listening to the room's Bluetooth noise and bouncing 24&nbsp;GHz radar off whoever's in there. It reads the room, not the phones, so it doesn't care when they shuffle their MAC addresses.</p>
-        <p class="figure-line"><strong>93.8%</strong> right in cross-validation, on four $70 boards.</p>
+        <p>Counts the people in a room without a camera, and without tracking anyone's phone.</p>
         <ul class="stack"><li>Python</li><li>ESP32</li><li>mmWave radar</li><li>BLE</li><li>Random Forest</li><li>MQTT</li></ul>
       </div>
       <figure class="sig sig-room">
@@ -129,14 +128,13 @@
         </div>
         <p class="code-err" id="code-err" aria-live="polite"></p>
       </div>
-      <button type="button" class="quiet-btn" id="play" aria-pressed="false">play</button>
     </section>
 
     <section class="station ch" id="harmonium" data-f="1000" data-k="band" data-v="0.3–3.7 kHz" data-name="harmonium" aria-labelledby="harm-h">
       <div class="ch-text">
         <p class="st-id"><span>0.3–3.7 kHz</span> modulated carrier</p>
         <h2 id="harm-h" data-decode><a href="https://github.com/CatNotBat/harmonium" rel="noopener noreferrer">harmonium</a></h2>
-        <p>A secret voice call hidden inside a normal Discord call. Your voice gets squeezed through Codec&nbsp;2, encrypted with WireGuard, then turned into noise by an OFDM modem I wrote. Discord carries the noise and has no idea. The trick is that WireGuard doesn't care what carries its packets, even a voice chat.</p>
+        <p>A secret voice call hidden inside a normal Discord call.</p>
         <ul class="stack"><li>Rust</li><li>DSP</li><li>WireGuard</li><li>Codec 2</li><li>OFDM</li></ul>
       </div>
       <figure class="sig sig-carrier" data-view="noise">
@@ -150,7 +148,6 @@
           <figcaption id="carrier-cap"><span class="when-noise">What Discord hears.</span><span class="when-comb">What the modem hears.</span> <span class="prov">An illustration, not a capture.</span></figcaption>
           <div class="harm-ctl">
             <label class="key"><span>wire</span><input type="range" id="harm-key" min="0" max="100" value="0" aria-label="Decrypt: from what Discord carries to what the other end hears"><span>voice</span></label>
-            <button type="button" class="quiet-btn" id="harm-play" aria-pressed="false" hidden>play</button>
           </div>
         </figure>
     </section>
@@ -159,7 +156,7 @@
       <div class="ch-text">
         <p class="st-id"><span>udp/53</span> query, response</p>
         <h2 id="dns-h" data-decode><a href="https://github.com/CatNotBat/DNS-client" rel="noopener noreferrer">dns resolver</a></h2>
-        <p>A DNS resolver in C with no libraries. Raw UDP sockets, RFC&nbsp;1035 open in the other window, every byte parsed by hand. Next to this, it asks the network for real. The first question was mine: <code>birds.fly</code>. It exists.</p>
+        <p>A DNS resolver in C, every byte parsed by hand. This one asks the network for real.</p>
         <ul class="stack"><li>C</li><li>UDP sockets</li><li>RFC 1035</li></ul>
         <p class="more"><a href="https://github.com/CatNotBat" rel="noopener noreferrer">more on GitHub</a></p>
       </div>
@@ -167,7 +164,6 @@
           <form class="resolve" id="resolve" autocomplete="off" hidden>
             <input id="qname" value="birds.fly" maxlength="253" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="Domain to resolve">
             <select id="qtype" aria-label="Record type"><option>A</option><option>AAAA</option><option>MX</option><option>TXT</option><option>NS</option></select>
-            <button type="submit" class="quiet-btn">resolve</button>
           </form>
           <div class="hex" tabindex="0" role="group" aria-label="Hex dump of a real DNS query and its answer" aria-live="polite">
 <pre id="hexdump"><span class="dir">asked</span>
@@ -253,7 +249,6 @@ thump:  .asciz "\n  thump\n\n"</pre>
           <div class="mcu-ctl">
             <button type="button" class="quiet-btn" id="mcu-step" hidden>step</button>
             <button type="button" class="quiet-btn" id="mcu-cont" hidden>continue</button>
-            <button type="button" class="quiet-btn" id="mcu-zap">irradiate</button>
             <button type="button" class="quiet-btn" id="mcu-edit" aria-pressed="false">edit</button>
           </div>
         </div>

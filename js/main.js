@@ -137,7 +137,8 @@ const music = (() => {
   }
   const sync = () => { hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; };
   ta.addEventListener('scroll', sync);
-  ta.addEventListener('input', () => { compile(); sync(); });
+  // writing music is asking to hear it
+  ta.addEventListener('input', () => { compile(); sync(); if (!sound.on) sound.toggle(); });
   ta.addEventListener('keydown', (e) => e.stopPropagation());
   compile();
   return {
@@ -160,7 +161,7 @@ const sound = (() => {
   let ctx = null, master, noiseG, voiceG, noiseBuf;
   let on = false, cur = null, pending = 'home', timers = [], oscs = [];
   const geiger = { alive: false, rate: 3 };
-  let flatOsc = null, flatG = null, dawnNodes = null, hushed = false;
+  let flatOsc = null, flatG = null, dawnNodes = null, hushed = false, hetO = null, hetG = null;
   let analyser = null, harmRaw = null, harmBufs = null, harmGains = null, harmKey = 0;
 
   function init() {
@@ -177,6 +178,8 @@ const sound = (() => {
     noiseG = ctx.createGain(); noiseG.gain.value = 0;
     src.connect(bp); bp.connect(noiseG); noiseG.connect(master); src.start();
     voiceG = ctx.createGain(); voiceG.gain.value = 0; voiceG.connect(master);
+    hetO = ctx.createOscillator(); hetO.type = 'sine'; hetO.frequency.value = 400;
+    hetG = ctx.createGain(); hetG.gain.value = 0; hetO.connect(hetG); hetG.connect(master); hetO.start();
     analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.6; analyser.connect(voiceG);
     return true;
   }
@@ -302,8 +305,6 @@ const sound = (() => {
     on = !on;
     btn.setAttribute('aria-pressed', String(on));
     btn.textContent = on ? 'sound on' : 'sound off';
-    const pb = $('#play'); pb.setAttribute('aria-pressed', String(on)); pb.textContent = on ? 'stop' : 'play';
-    const hb = $('#harm-play'); hb.setAttribute('aria-pressed', String(on)); hb.textContent = on ? 'stop' : 'play';
     if (on) {
       ctx.resume(); master.gain.setTargetAtTime(0.5, ctx.currentTime, 0.1); cur = null; tuner.refresh();
       decodeHarm().then(() => { if (cur === 'harmonium') { stopVoice(); cur = null; tuner.refresh(); } });
@@ -312,6 +313,15 @@ const sound = (() => {
   });
   return {
     station, levels, geiger, toggle: () => btn.click(),
+    // the heterodyne: near a station you hear the beat between you and it, falling to nothing as you lock on
+    het(dist, capture, lock) {
+      if (!on || !hetG) return;
+      const t = ctx.currentTime;
+      if (hushed || dist <= lock || dist >= capture) { hetG.gain.setTargetAtTime(0, t, 0.04); return; }
+      const x = (dist - lock) / (capture - lock);
+      hetO.frequency.setTargetAtTime(25 + x * x * 2200, t, 0.02);
+      hetG.gain.setTargetAtTime(0.026 * Math.sin(Math.PI * Math.min(1, x * 1.1)) ** 0.7, t, 0.03);
+    },
     loadHarmonium(raw) { harmRaw = raw; if (on) decodeHarm().then(() => { if (cur === 'harmonium') { stopVoice(); cur = null; tuner.refresh(); } }); },
     key(k) {
       harmKey = clamp(k, 0, 1);
@@ -380,6 +390,7 @@ const sound = (() => {
     hush(onOff) {
       if (!ctx) return;
       const t = ctx.currentTime;
+      if (onOff && hetG) hetG.gain.setTargetAtTime(0, t, 0.03);
       if (onOff) { noiseG.gain.cancelScheduledValues(t); noiseG.gain.setTargetAtTime(0, t, 0.05); voiceG.gain.cancelScheduledValues(t); voiceG.gain.setTargetAtTime(0, t, 0.05); }
       hushed = onOff;
     },
@@ -420,7 +431,7 @@ function feed(amount) {
   }
 }
 addEventListener('pointermove', (e) => {
-  if (lastPointer) feed(Math.min(1.2, Math.hypot(e.clientX - lastPointer[0], e.clientY - lastPointer[1]) * (state === 'dormant' ? 0.012 : 0.004)));
+  if (lastPointer) feed(Math.min(1.2, Math.hypot(e.clientX - lastPointer[0], e.clientY - lastPointer[1]) * (state === 'dormant' ? 0.012 : tuner.lockedId() === 'rv32' ? 0.02 : 0.004)));
   lastPointer = [e.clientX, e.clientY];
 }, { passive: true });
 addEventListener('pointerdown', () => feed(2), { passive: true });
@@ -744,6 +755,7 @@ const tuner = (() => {
 
     wire.staticLevel = isLocked ? 0 : 1 - sig;
     sound.levels(isLocked ? 0.1 : 1 - sig * 0.8, sig);
+    sound.het(dist, CAPTURE, LOCK);
     if (sig > 0) sound.station(s.id);
     if (locked?.id !== 'gamma') dwell.textContent = '';
 
@@ -823,7 +835,7 @@ const tuner = (() => {
  * State: listening or dormant.
  * ================================================================== */
 let state = 'listening';
-const stateBtns = $$('[data-state]');
+const stateBtns = $$('.r-state [data-state]');
 function setState(s) {
   if (s === state) return;
   const prev = state;
@@ -837,10 +849,16 @@ stateBtns.forEach((b) => b.addEventListener('click', () => setState(b.dataset.st
 // a tap anywhere wakes it (moving around only gathers); a short grace so the click that put it to sleep doesn't wake it
 let dormantSince = 0;
 addEventListener('pointerdown', (e) => {
-  if (state !== 'dormant' || performance.now() - dormantSince < 400 || e.target.closest('[data-state]')) return;
+  if (state !== 'dormant' || performance.now() - dormantSince < 400 || e.target.closest('.r-state')) return;
   setState('listening');
 });
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && state === 'dormant' && !dialog.open) setState('listening'); });
+// leave it alone for a while and it does what it does most of its life: it dies, and waits
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = performance.now(); return; }
+  if (hiddenAt && performance.now() - hiddenAt > 45000 && state === 'listening' && !dialog.open) setState('dormant');
+});
 
 /* ================================================================== *
  * Small things
@@ -883,7 +901,9 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && state === 'dorman
   }
   key.addEventListener('input', apply);
   key.addEventListener('keydown', (e) => e.stopPropagation());
-  $('#harm-play').addEventListener('click', () => sound.toggle());
+  // touching the key is asking to hear it
+  key.addEventListener('pointerdown', () => { if (!sound.on) sound.toggle(); });
+  key.addEventListener('keydown', () => { if (!sound.on) sound.toggle(); }, { once: true });
   apply();
   raf = requestAnimationFrame(draw);
 })();
@@ -945,6 +965,7 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && state === 'dorman
     }
   }
   form.addEventListener('submit', (e) => { e.preventDefault(); run(); });
+  qtype.addEventListener('change', run);
   [qname, qtype].forEach((el) => el.addEventListener('keydown', (e) => e.stopPropagation()));
 })();
 
@@ -1309,13 +1330,6 @@ const mcu = (() => {
   stepB.addEventListener('click', () => { cpu.step(); annotate(); render(); });
   contB.addEventListener('click', () => { resume(); render(); });
 
-  const zap = $('#mcu-zap');
-  let zapT = 0;
-  const zapOn = () => { clearInterval(zapT); feed(5); zapT = setInterval(() => feed(5), 110); };
-  const zapOff = () => clearInterval(zapT);
-  zap.addEventListener('pointerdown', zapOn);
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => zap.addEventListener(ev, zapOff));
-  zap.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') feed(8); });
   editB.addEventListener('click', () => {
     if (ed.hidden) {
       ed.value = source;
@@ -1480,7 +1494,6 @@ addEventListener('hashchange', () => {
   else if (tuner.byId.has(h) && h !== tuner.lockedId()) tuner.tuneTo(h);
 });
 
-$('#play').addEventListener('click', () => sound.toggle());
 
 /* ================================================================== *
  * Real recordings, when there are any. data/manifest.json says which
@@ -1510,7 +1523,6 @@ $('#play').addEventListener('click', () => sound.toggle());
     try {
       const raw = await Promise.all([m.harmonium_audio.wire, m.harmonium_audio.voice].map(async (f) => (await fetch(`data/${f}`)).arrayBuffer()));
       sound.loadHarmonium(raw);
-      $('#harm-play').hidden = false;
     } catch { /* keep the synthetic carrier */ }
   }
 })();
