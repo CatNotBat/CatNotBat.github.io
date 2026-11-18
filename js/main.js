@@ -765,6 +765,57 @@ $('[data-carrier-toggle]')?.addEventListener('click', (e) => {
   });
 })();
 
+// roomsense: when you're in the room, each corner node ranges you; the circles cross at the estimate
+(() => {
+  const fig = $('.sig-room');
+  if (!fig) return;
+  const svg = fig.querySelector('svg');
+  const rings = [...fig.querySelectorAll('.sense > circle')];
+  const est = fig.querySelector('.est');
+  const occ = fig.querySelector('.occ');
+  const NODES = [[24, 18], [176, 18], [24, 142], [176, 142]];
+  const ROOM = { x0: 20, y0: 14, x1: 180, y1: 146 };
+  let target = null;
+  let e = [100, 80];
+  let raf = 0;
+  let jitter = [0, 0];
+
+  function frame() {
+    raf = 0;
+    if (!target) return;
+    const still = reduceMotion.matches;
+    // the estimate follows you, a little late and never quite sure (RSSI is noisy)
+    jitter = still ? [0, 0] : [jitter[0] * 0.85 + (Math.random() - 0.5) * 1.6, jitter[1] * 0.85 + (Math.random() - 0.5) * 1.6];
+    const k = still ? 1 : 0.14;
+    e = [e[0] + (target[0] - e[0]) * k, e[1] + (target[1] - e[1]) * k];
+    const ex = e[0] + jitter[0], ey = e[1] + jitter[1];
+    est.setAttribute('transform', `translate(${ex.toFixed(1)} ${ey.toFixed(1)})`);
+    rings.forEach((c, i) => {
+      const [nx, ny] = NODES[i];
+      const noise = still ? 0 : (Math.random() - 0.5) * 2.2;
+      c.setAttribute('r', (Math.hypot(ex - nx, ey - ny) + noise).toFixed(1));
+    });
+    raf = requestAnimationFrame(frame);
+  }
+  function at(ev) {
+    const m = svg.getScreenCTM();
+    if (!m) return null;
+    const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse());
+    return p.x > ROOM.x0 && p.x < ROOM.x1 && p.y > ROOM.y0 && p.y < ROOM.y1 ? [p.x, p.y] : null;
+  }
+  function move(ev) {
+    const p = at(ev);
+    if (p && !target) { e = p.slice(); occ.textContent = '1'; }
+    target = p;
+    fig.classList.toggle('sensing', !!p);
+    if (!p) occ.textContent = '';
+    if (p && !raf) raf = requestAnimationFrame(frame);
+  }
+  svg.addEventListener('pointermove', move);
+  svg.addEventListener('pointerdown', move);
+  svg.addEventListener('pointerleave', () => { target = null; fig.classList.remove('sensing'); occ.textContent = ''; });
+})();
+
 const lastBeatEl = $('#last-beat');
 function renderLastBeat() {
   const t = Number(store.get('lk.lastBeat'));

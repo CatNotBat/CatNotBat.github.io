@@ -1,10 +1,6 @@
 read flat. no emphasis. same pace for every pair, about one pair a second.
 leave a full breath between the groups. this is the qname of the real query
-in data/dns-and-birds-fly.json: and.birds.fly, as bytes.
-
-    zero three.
-
-    six one.     six echo.    six four.
+in data/dns-birds-fly.json: birds.fly, as bytes.
 
     zero five.
 

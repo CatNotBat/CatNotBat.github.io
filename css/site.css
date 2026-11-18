@@ -409,3 +409,16 @@ dialog#better-days::backdrop { background: #000; }
 .uart { margin: 0; min-height: 9.5em; max-width: 34rem; font: 400 .8125rem/1.45 var(--mono); color: var(--trace); white-space: pre-wrap; border-top: 1px solid var(--line); padding-top: .6rem; }
 .mcu-ctl { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
 .mcu-ctl .quiet-btn { margin-top: 0; }
+
+/* roomsense: four ranges that cross where you are */
+.sig-room svg { touch-action: pan-y; cursor: crosshair; }
+.sig-room .rings { transition: opacity .6s ease-out; }
+.sig-room.sensing .rings { opacity: .15; }
+.sig-room .sense circle { fill: none; stroke: var(--trace); stroke-width: .7; stroke-dasharray: 1.5 2.5; opacity: 0; transition: opacity .5s ease-out; }
+.sig-room.sensing .sense circle { opacity: .75; }
+.sig-room .sense .est circle { stroke-dasharray: none; fill: rgba(88, 168, 159, .14); stroke-width: .6; }
+.sig-room .sense .est .core { fill: var(--trace); stroke: none; }
+.sig-room .occ { font: 500 9px var(--mono); fill: var(--trace); opacity: 0; transition: opacity .5s ease-out; }
+.sig-room.sensing .occ { opacity: 1; }
+.sig-room .nodes rect { transition: fill .3s; }
+.sig-room.sensing .nodes rect { fill: rgba(88, 168, 159, .25); }

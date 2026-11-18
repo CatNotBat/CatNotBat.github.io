@@ -6,7 +6,7 @@ The site is a radio. The `freq` readout is a real dial. Each station sits at the
 | dial | station | why it's there |
 |---|---|---|
 | 50 Hz | the hum | Israeli mains. The wires at the top hum along with it, and you can pluck them |
-| 53 | dns resolver | the port number, sitting right next to the hum. Shows a real query for `and.birds.fly`, answered NXDOMAIN |
+| 53 | dns resolver | the port number, sitting right next to the hum. Shows a real query for `birds.fly`: it exists (rcode 0, two A records, looks parked). `agree` opens Better days |
 | 440 Hz | a (pattern) | live-codeable music, see below |
 | voice band | harmonium | audio band, where the OFDM modem lives |
 | 1420.405 MHz | **hidden**: the hydrogen line | not in the presets. A hint toward gamma |
@@ -82,12 +82,12 @@ I chose not to embed Strudel itself: it's AGPL-3.0 (the whole site would have to
   Use m4a or mp3 so Safari plays it.
 
 ## harmonium numbers station (done, no call needed)
-The audio on the site is the real harmonium pipeline: Codec 2, WireGuard, the OFDM modem, then a simulated 64 kbps Opus channel, run offline with `harmonium selftest`. The voice reading the `and.birds.fly` bytes is macOS `say -v Samantha` (numbers stations often used synthetic voices).
+The audio on the site is the real harmonium pipeline: Codec 2, WireGuard, the OFDM modem, then a simulated 64 kbps Opus channel, run offline with `harmonium selftest`. The voice reading the `birds.fly` bytes is macOS `say -v Samantha` (numbers stations often used synthetic voices).
 The run had 0% voice loss and 0 failed modem frames. The caption says it's offline.
 To swap in your own voice: record `tools/numbers.txt` as a voice memo, then
 ```
 afconvert -f WAVE -d LEI16@48000 -c 1 memo.m4a numbers.wav
 harmonium selftest --input numbers.wav --opus --output voice.wav --modem-output wire.wav
-uv run tools/harmonium_take.py voice.wav wire.wav --start 3.8 --length 23 --voice-offset 0.96 --note "..."
+uv run tools/harmonium_take.py voice.wav wire.wav --start 3.8 --length 17.5 --voice-offset 0.96 --note "..."
 ```
 (`--voice-offset` is the latency selftest prints. Pick `--start` / `--length` to cover one reading.)

@@ -80,10 +80,10 @@
     </section>
 
     <section class="station st-text" id="hum" data-f="50" data-k="freq" data-v="50 Hz" data-name="the hum" aria-labelledby="hum-h">
-      <p class="st-id"><span>50 Hz</span> the hum</p>
+      <p class="st-id"><span>50 Hz</span></p>
       <h2 id="hum-h" data-decode>Hi, I'm Lev.</h2>
       <p>I live in Tel Aviv, where the wall hums at 50&nbsp;Hz.</p>
-      <p>I like taking things apart down to the bytes and the waveforms, mostly to find out whether a dumb idea works.</p>
+      <p>I like making stuff.</p>
     </section>
 
     <section class="station ch" id="roomsense" data-f="24e9" data-k="radar" data-v="24 GHz" data-name="roomsense" aria-labelledby="room-h">
@@ -104,6 +104,11 @@
               <circle cx="24" cy="142" r="60" /><circle cx="24" cy="142" r="110" />
               <circle cx="176" cy="142" r="46" /><circle cx="176" cy="142" r="88" />
             </g>
+            <g class="sense" clip-path="url(#room-clip)">
+              <circle cx="24" cy="18" r="0" /><circle cx="176" cy="18" r="0" /><circle cx="24" cy="142" r="0" /><circle cx="176" cy="142" r="0" />
+              <g class="est"><circle r="9" /><circle r="2.2" class="core" /></g>
+            </g>
+            <text class="occ" x="100" y="140" text-anchor="middle"></text>
             <g class="nodes"><rect x="18" y="12" width="12" height="12"/><rect x="170" y="12" width="12" height="12"/><rect x="18" y="136" width="12" height="12"/><rect x="170" y="136" width="12" height="12"/></g>
           </svg>
           <figcaption id="room-cap">Schematic. Four nodes, one per corner, listening to the room instead of the phones in it.</figcaption>
@@ -148,26 +153,26 @@
       <div class="ch-text">
         <p class="st-id"><span>udp/53</span> query, response</p>
         <h2 id="dns-h" data-decode><a href="https://github.com/CatNotBat/DNS-client" rel="noopener noreferrer">dns resolver</a></h2>
-        <p>A DNS resolver in C with no libraries. Raw UDP sockets, RFC&nbsp;1035 open in the other window, every byte parsed by hand. Next to this is a real query I sent while making this page. Turns out <code>.fly</code> is a real top-level domain. <code>birds.fly</code> isn't.</p>
+        <p>A DNS resolver in C with no libraries. Raw UDP sockets, RFC&nbsp;1035 open in the other window, every byte parsed by hand. Next to this is a real query I sent while making this page, for <code>birds.fly</code>. It exists.</p>
         <ul class="stack"><li>C</li><li>UDP sockets</li><li>RFC 1035</li></ul>
         <p class="more"><a href="https://github.com/CatNotBat" rel="noopener noreferrer">more on GitHub</a></p>
       </div>
       <figure class="sig sig-dns">
-          <div class="hex" tabindex="0" role="group" aria-label="Hex dump of a real DNS query for and.birds.fly and its NXDOMAIN response">
+          <div class="hex" tabindex="0" role="group" aria-label="Hex dump of a real DNS query for birds.fly and its answer">
 <pre><span class="dir">asked</span>
-<span class="off">0000</span>  4c 6b <em>01 00</em> 00 01 00 00 00 <em>00</em> 00 00 <b>03 61 6e 64</b>
-<span class="off">0010</span>  <b>05 62 69 72 64 73 03 66 6c 79 00</b> 00 01 00 01
+<span class="off">0000</span>  4c 6b <em>01 00</em> 00 01 00 <em>00</em> 00 00 00 00 <b>05 62 69 72</b>
+<span class="off">0010</span>  <b>64 73 03 66 6c 79 00</b> 00 01 00 01
 
 <span class="dir">answer</span>
-<span class="off">0000</span>  4c 6b <em>81 83</em> 00 01 00 00 00 <em>01</em> 00 00 <b>03 61 6e 64</b>
-<span class="off">0010</span>  <b>05 62 69 72 64 73 03 66 6c 79 00</b> 00 01 00 01
-<span class="off">  +71</span>  authority  fly.  SOA  ns03.domaincontrol.com
+<span class="off">0000</span>  4c 6b <em>81 80</em> 00 01 00 <em>02</em> 00 00 00 00 <b>05 62 69 72</b>
+<span class="off">0010</span>  <b>64 73 03 66 6c 79 00</b> 00 01 00 01
+<span class="off">  +32</span>  A  3.33.130.190   A  15.197.148.33
 
-<span class="dir">qname</span>   <b>and.birds.fly</b>
-<span class="dir">rcode</span>   <em>3</em>  NXDOMAIN</pre>
+<span class="dir">qname</span>   <b>birds.fly</b>
+<span class="dir">rcode</span>   <em>0</em>  NOERROR</pre>
           </div>
-          <figcaption>18 November 2026, to 1.1.1.1. The answer is rcode 3: no such domain.</figcaption>
-          <button type="button" class="quiet-btn" data-reveal>disagree</button>
+          <figcaption>18 November 2026, to 1.1.1.1.</figcaption>
+          <button type="button" class="quiet-btn" data-reveal>agree</button>
         </figure>
     </section>
 
