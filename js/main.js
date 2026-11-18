@@ -1,5 +1,6 @@
 import { Dither, quad } from './dither.js';
 import { assemble, CPU, ABI } from './rv32.js';
+import { resolve as dnsResolve, RCODE } from './dns.js';
 
 const root = document.documentElement;
 root.classList.add('js');
@@ -159,7 +160,8 @@ const sound = (() => {
   let ctx = null, master, noiseG, voiceG, noiseBuf;
   let on = false, cur = null, pending = 'home', timers = [], oscs = [];
   const geiger = { alive: false, rate: 3 };
-  let flatOsc = null, flatG = null, dawnNodes = null;
+  let flatOsc = null, flatG = null, dawnNodes = null, hushed = false;
+  let analyser = null, harmRaw = null, harmBufs = null, harmGains = null, harmKey = 0;
 
   function init() {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -175,6 +177,7 @@ const sound = (() => {
     noiseG = ctx.createGain(); noiseG.gain.value = 0;
     src.connect(bp); bp.connect(noiseG); noiseG.connect(master); src.start();
     voiceG = ctx.createGain(); voiceG.gain.value = 0; voiceG.connect(master);
+    analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.6; analyser.connect(voiceG);
     return true;
   }
   function osc(type, f, g) {
@@ -217,15 +220,30 @@ const sound = (() => {
     hum() { osc('sawtooth', 50, 0.05); osc('sine', 100, 0.07); osc('sine', 150, 0.03); },
     dns() { timers.push(setInterval(() => { blip(1200, 0.05); setTimeout(() => blip(1800, 0.08, 0.1), 170); }, 1600)); },
     harmonium() {
-      const a = Array.from({ length: 10 }, (_, i) => osc('sine', 700 + i * 160, 0.012));
-      timers.push(setInterval(() => a.forEach((o, i) => o.frequency.setTargetAtTime(700 + i * 160 + (Math.random() - 0.5) * 50, ctx.currentTime, 0.02)), 90));
+      // the real take, when there is one: what Discord carried and what came out, looped together
+      if (harmBufs) {
+        const at = ctx.currentTime + 0.05;
+        harmGains = harmBufs.map((b, i) => {
+          const g = ctx.createGain(); g.gain.value = keyGain(i);
+          const src = ctx.createBufferSource(); src.buffer = b; src.loop = true;
+          if (i === 0) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600; lp.Q.value = 0.5; src.connect(lp); lp.connect(g); }
+          else src.connect(g);
+          g.connect(analyser); src.start(at); oscs.push(src);
+          return g;
+        });
+        return;
+      }
+      const a = Array.from({ length: 10 }, (_, i) => osc('sine', 700 + i * 160, 0.005));
+      timers.push(setInterval(() => a.forEach((o, i) => o.frequency.setTargetAtTime(700 + i * 160 + (Math.random() - 0.5) * 20, ctx.currentTime, 0.15)), 320));
     },
     hydrogen() { osc('sine', 1420.405, 0.035); },
     home() { timers.push(setInterval(() => blip(2402, 0.025, 0.05, 'sine'), 2100)); },
     roomsense() {
-      const o = osc('sine', 400, 0.045);
-      const sweep = () => { const t = ctx.currentTime; o.frequency.setValueAtTime(400, t); o.frequency.linearRampToValueAtTime(1600, t + 1.2); };
-      sweep(); timers.push(setInterval(sweep, 1500));
+      // room tone: barely there, the sound of a quiet room with radios in its corners
+      const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
+      const g = ctx.createGain(); g.gain.value = 0.05;
+      s.connect(lp); lp.connect(g); g.connect(voiceG); s.start(); oscs.push(s);
     },
     a440() {
       // look only 150 ms ahead, so an edit is heard almost as soon as it is typed
@@ -256,6 +274,13 @@ const sound = (() => {
       tick();
     },
   };
+  // equal-power crossfade: the key turns the wire into the voice
+  // the raw modem is harsh, so it sits low; the voice comes up clear
+  const keyGain = (i) => (i ? 0.95 * Math.sin((harmKey * Math.PI) / 2) : 0.28 * Math.cos((harmKey * Math.PI) / 2));
+  async function decodeHarm() {
+    if (harmBufs || !harmRaw || !ctx) return;
+    try { harmBufs = await Promise.all(harmRaw.map((b) => ctx.decodeAudioData(b.slice(0)))); } catch { harmBufs = null; }
+  }
   function stopVoice() {
     timers.forEach(clearInterval); timers = [];
     oscs.forEach((o) => { try { o.stop(); } catch { /* already stopped */ } }); oscs = [];
@@ -264,10 +289,10 @@ const sound = (() => {
   function station(id) {
     pending = id;
     if (!on || id === cur) return;
-    stopVoice(); cur = id; voices[id]?.();
+    stopVoice(); harmGains = null; cur = id; voices[id]?.();
   }
   function levels(staticLevel, signal) {
-    if (!on) return;
+    if (!on || hushed) return;
     const t = ctx.currentTime;
     noiseG.gain.setTargetAtTime(0.015 + 0.16 * staticLevel, t, 0.04);
     voiceG.gain.setTargetAtTime(signal * signal, t, 0.06);
@@ -278,28 +303,43 @@ const sound = (() => {
     btn.setAttribute('aria-pressed', String(on));
     btn.textContent = on ? 'sound on' : 'sound off';
     const pb = $('#play'); pb.setAttribute('aria-pressed', String(on)); pb.textContent = on ? 'stop' : 'play';
-    if (on) { ctx.resume(); master.gain.setTargetAtTime(0.5, ctx.currentTime, 0.1); cur = null; tuner.refresh(); }
+    const hb = $('#harm-play'); hb.setAttribute('aria-pressed', String(on)); hb.textContent = on ? 'stop' : 'play';
+    if (on) {
+      ctx.resume(); master.gain.setTargetAtTime(0.5, ctx.currentTime, 0.1); cur = null; tuner.refresh();
+      decodeHarm().then(() => { if (cur === 'harmonium') { stopVoice(); cur = null; tuner.refresh(); } });
+    }
     else { master.gain.setTargetAtTime(0, ctx.currentTime, 0.05); stopVoice(); cur = null; }
   });
   return {
     station, levels, geiger, toggle: () => btn.click(),
+    loadHarmonium(raw) { harmRaw = raw; if (on) decodeHarm().then(() => { if (cur === 'harmonium') { stopVoice(); cur = null; tuner.refresh(); } }); },
+    key(k) {
+      harmKey = clamp(k, 0, 1);
+      if (harmGains && ctx) harmGains.forEach((g, i) => g.gain.setTargetAtTime(keyGain(i), ctx.currentTime, 0.03));
+    },
+    spectrum(out) {
+      if (!on || cur !== 'harmonium' || !analyser) return 0;
+      analyser.getByteFrequencyData(out);
+      return ctx.sampleRate;
+    },
     get on() { return on; },
     twang() { if (on) blip(90 + Math.random() * 90, 0.7, 0.14, 'triangle'); },
     // one BLE advertisement, heard by each node from where it sits: panned, and as loud as it heard it
     adv(heard) {
       if (!on || cur !== 'roomsense') return;
       const t = ctx.currentTime;
-      const f = [1201, 1213, 1240][(Math.random() * 3) | 0]; // ch 37/38/39, halved into earshot
+      const f = [2402, 2426, 2480][(Math.random() * 3) | 0] / 1.2; // ch 37/38/39, as a soft filtered tick
       for (const { pan, db } of heard) {
-        const g = clamp(10 ** ((db + 40) / 20), 0, 1) * 0.5;
-        if (g < 0.004) continue;
-        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const g = clamp(10 ** ((db + 40) / 20), 0, 1) * 0.22;
+        if (g < 0.003) continue;
+        const o = ctx.createBufferSource(); o.buffer = noiseBuf;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 9;
         const gn = ctx.createGain();
-        gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g, t + 0.003); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
-        o.connect(gn);
+        gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g, t + 0.002); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.022);
+        o.connect(bp); bp.connect(gn);
         if (ctx.createStereoPanner) { const pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan, -1, 1); gn.connect(pn); pn.connect(voiceG); }
         else gn.connect(voiceG);
-        o.start(t); o.stop(t + 0.05);
+        o.start(t, Math.random()); o.stop(t + 0.04);
       }
     },
     // Better days: the monitor
@@ -336,10 +376,17 @@ const sound = (() => {
         dawnNodes = null;
       }
     },
+    // the story is the one silent place: no static, no station
+    hush(onOff) {
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      if (onOff) { noiseG.gain.cancelScheduledValues(t); noiseG.gain.setTargetAtTime(0, t, 0.05); voiceG.gain.cancelScheduledValues(t); voiceG.gain.setTargetAtTime(0, t, 0.05); }
+      hushed = onOff;
+    },
     chime(up) {
       if (!on || cur !== 'roomsense') return;
-      blip(up ? 440 : 659.25, 0.5, 0.06, 'sine');
-      setTimeout(() => blip(up ? 659.25 : 440, 0.7, 0.06, 'sine'), 160);
+      blip(up ? 329.63 : 493.88, 0.9, 0.025, 'sine');
+      setTimeout(() => blip(up ? 493.88 : 329.63, 1.2, 0.022, 'sine'), 220);
     },
     thump() { if (on) { blip(62, 0.28, 0.5, 'sine'); setTimeout(() => blip(55, 0.22, 0.35, 'sine'), 190); } },
   };
@@ -616,7 +663,7 @@ const tuner = (() => {
   // remember the original text of every node that can drown in static
   for (const s of stations) {
     const walker = document.createTreeWalker(s.el, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => (n.parentElement.closest('pre, svg, button, .dwell, textarea, .code, .mcu, .prov') || !n.data.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+      acceptNode: (n) => (n.parentElement.closest('pre, svg, button, .dwell, textarea, .code, .mcu, .prov, .resolve') || !n.data.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
     });
     s.nodes = [];
     while (walker.nextNode()) s.nodes.push({ n: walker.currentNode, t: walker.currentNode.data });
@@ -798,13 +845,108 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && state === 'dorman
 /* ================================================================== *
  * Small things
  * ================================================================== */
-$('[data-carrier-toggle]')?.addEventListener('click', (e) => {
-  const btn = e.currentTarget;
-  const fig = btn.closest('.sig-carrier');
-  const on = fig.dataset.view !== 'comb';
-  fig.dataset.view = on ? 'comb' : 'noise';
-  btn.setAttribute('aria-pressed', String(on));
-});
+// harmonium: one key, from what Discord carries to what the other end hears, and a live look at it
+(() => {
+  const fig = $('.sig-carrier');
+  if (!fig) return;
+  const key = $('#harm-key');
+  const noise = fig.querySelector('.noise');
+  const comb = fig.querySelector('.comb');
+  const canvas = fig.querySelector('.live');
+  const d = new Dither(canvas, 2);
+  const bins = new Uint8Array(1024);
+  let raf = 0;
+  function apply() {
+    const k = Number(key.value) / 100;
+    sound.key(k);
+    noise.style.opacity = String(1 - 0.85 * k);
+    comb.style.opacity = String(k);
+    fig.dataset.view = k > 0.5 ? 'comb' : 'noise';
+  }
+  function draw() {
+    raf = requestAnimationFrame(draw);
+    const rate = tuner.lockedId() === 'harmonium' ? sound.spectrum(bins) : 0;
+    fig.classList.toggle('playing', !!rate);
+    if (!rate) return;
+    d.resize();
+    const hz = rate / 2048;
+    d.render((o, w, h) => {
+      o.fillStyle = 'rgba(255,0,0,1)';
+      for (let x = 0; x < w; x++) {
+        const v = bins[Math.min(1023, Math.floor(((x / w) * 4000) / hz))] / 255;
+        const bh = Math.round(v * v * h * 1.1);
+        o.globalAlpha = 0.35 + 0.65 * v;
+        o.fillRect(x, h - bh, 1, bh);
+      }
+      o.globalAlpha = 1;
+    });
+  }
+  key.addEventListener('input', apply);
+  key.addEventListener('keydown', (e) => e.stopPropagation());
+  $('#harm-play').addEventListener('click', () => sound.toggle());
+  apply();
+  raf = requestAnimationFrame(draw);
+})();
+
+// dns: ask the wire anything, and see the bytes both ways
+(() => {
+  const form = $('#resolve');
+  if (!form) return;
+  const qname = $('#qname');
+  const qtype = $('#qtype');
+  const pre = $('#hexdump');
+  const cap = $('#dns-cap');
+  const verdict = $('#dns-verdict');
+  form.hidden = false;
+  const hx = (b) => b.toString(16).padStart(2, '0');
+  const line = (frag, ...parts) => { parts.forEach((p) => frag.append(p)); frag.append('\n'); };
+  const span = (cls, text) => { const e = document.createElement(cls === 'b' || cls === 'em' ? cls : 'span'); if (cls !== 'b' && cls !== 'em') e.className = cls; e.textContent = text; return e; };
+
+  function dump(frag, bytes, other, qEnd, maxRows = 20) {
+    const rows = Math.ceil(bytes.length / 16);
+    for (let r = 0; r < Math.min(rows, maxRows); r++) {
+      frag.append(span('off', (r * 16).toString(16).padStart(4, '0')), ' ');
+      for (let i = r * 16; i < Math.min(bytes.length, r * 16 + 16); i++) {
+        const t = hx(bytes[i]);
+        frag.append(' ');
+        if (i < 12 && other && other[i] !== bytes[i]) frag.append(span('em', t));
+        else if (i >= 12 && i < qEnd) frag.append(span('b', t));
+        else frag.append(t);
+      }
+      frag.append('\n');
+    }
+    if (rows > maxRows) line(frag, span('off', `  +${bytes.length - maxRows * 16}`), '  more bytes');
+  }
+
+  async function run() {
+    const name = qname.value;
+    form.setAttribute('aria-busy', 'true');
+    cap.textContent = 'asking 1.1.1.1...';
+    try {
+      const r = await dnsResolve(name, qtype.value);
+      const frag = document.createDocumentFragment();
+      line(frag, span('dir', 'asked'));
+      dump(frag, r.query.bytes, r.answer, r.query.qnameEnd);
+      line(frag);
+      line(frag, span('dir', 'answer'));
+      dump(frag, r.answer, r.query.bytes, r.query.qnameEnd);
+      line(frag);
+      line(frag, span('dir', 'qname'), '   ', span('b', r.query.name));
+      line(frag, span('dir', 'rcode'), '   ', span('em', String(r.parsed.rcode)), `  ${RCODE[r.parsed.rcode] ?? '?'}`);
+      for (const a of r.parsed.answers.slice(0, 8)) line(frag, span('dir', a.type.padEnd(5)), '   ', a.data, span('off', `  ttl ${a.ttl}`));
+      if (!r.parsed.answers.length) for (const a of r.parsed.authority.slice(0, 2)) line(frag, span('dir', 'auth'), '    ', `${a.type} ${a.data}`);
+      pre.replaceChildren(frag);
+      cap.textContent = `Just now, to 1.1.1.1 over HTTPS, ${r.ms} ms.`;
+      verdict.textContent = r.parsed.rcode === 3 ? 'disagree' : 'agree';
+    } catch (e) {
+      cap.textContent = e instanceof TypeError ? 'Could not reach 1.1.1.1.' : e.message;
+    } finally {
+      form.removeAttribute('aria-busy');
+    }
+  }
+  form.addEventListener('submit', (e) => { e.preventDefault(); run(); });
+  [qname, qtype].forEach((el) => el.addEventListener('keydown', (e) => e.stopPropagation()));
+})();
 
 (() => {
   const el = $('#addr');
@@ -849,7 +991,26 @@ $('[data-carrier-toggle]')?.addEventListener('click', (e) => {
   let you = null;        // where the pointer is, in room units, or null when gone
   let p = 0.02;          // presence probability
   let occupied = false;
-  let raf = 0, last = 0, nextAdv = 0, nextRot = 0, nextRadar = 0;
+  let raf = 0, last = 0, nextAdv = 0, nextRot = 0, nextRadar = 0, nextTrack = 0;
+  let fused = null, shown = null, seen = false;
+  const track = [];
+  const NS = 'http://www.w3.org/2000/svg';
+  const radarG = fig.querySelector('.radar');
+  const trackEl = document.createElementNS(NS, 'polyline');
+  trackEl.setAttribute('class', 'track');
+  radarG.prepend(trackEl);
+  // phosphor: each radar return leaves a dot that fades, like an old scope
+  const dots = Array.from({ length: 48 }, () => {
+    const el = document.createElementNS(NS, 'circle');
+    el.setAttribute('r', '0.9'); el.setAttribute('class', 'ph'); el.setAttribute('opacity', '0');
+    radarG.prepend(el);
+    return { el, t0: -1e9, a: 0 };
+  });
+  let dotI = 0;
+  const glow = (x, y, t) => {
+    const g = dots[dotI++ % dots.length];
+    g.t0 = t; g.el.setAttribute('cx', x.toFixed(1)); g.el.setAttribute('cy', y.toFixed(1));
+  };
   const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 1.15;
   const inside = (x, y) => x > ROOM.x0 && x < ROOM.x1 && y > ROOM.y0 && y < ROOM.y1;
   const sees = (i, x, y) => {
@@ -871,9 +1032,9 @@ $('[data-carrier-toggle]')?.addEventListener('click', (e) => {
     last = t;
     const here = you && inside(you[0], you[1]);
 
-    // radar: each node that can see you reports its own slightly wrong position, at 10 Hz
+    // radar: each node that can see you reports its own slightly wrong position (~16 Hz)
     if (t > nextRadar) {
-      nextRadar = t + 100;
+      nextRadar = t + 60;
       let fx = 0, fy = 0, n = 0;
       NODES.forEach(([nx, ny], i) => {
         const on = !!you && sees(i, you[0], you[1]);
@@ -881,13 +1042,16 @@ $('[data-carrier-toggle]')?.addEventListener('click', (e) => {
         lines[i].classList.toggle('on', on);
         blips[i].classList.toggle('on', on);
         if (!on) return;
-        const bx = you[0] + gauss() * 2.5, by = you[1] + gauss() * 2.5;
+        const bx = you[0] + gauss() * 1.4, by = you[1] + gauss() * 1.4;
         lines[i].setAttribute('x2', bx.toFixed(1)); lines[i].setAttribute('y2', by.toFixed(1));
         blips[i].setAttribute('transform', `translate(${bx.toFixed(1)} ${by.toFixed(1)})`);
+        glow(bx, by, t);
         fx += bx; fy += by; n++;
       });
-      est.classList.toggle('on', n > 0);
-      if (n) est.setAttribute('transform', `translate(${(fx / n).toFixed(1)} ${(fy / n).toFixed(1)})`);
+      seen = n > 0;
+      if (n) { fused = [fx / n, fy / n]; if (!shown) shown = fused.slice(); }
+      else shown = null;
+      est.classList.toggle('on', seen);
       // the ears: everyone hears the phone, louder when close, quieter through the wall
       dbm.forEach((el, i) => {
         if (!you) { el.textContent = ''; return; }
@@ -895,6 +1059,23 @@ $('[data-carrier-toggle]')?.addEventListener('click', (e) => {
         el.textContent = `${Math.round(r)} dBm`;
         el.classList.toggle('loud', r > -62);
       });
+    }
+
+    // between reports the estimate glides; a faint track remembers where you've been
+    if (seen && shown) {
+      const k = reduceMotion.matches ? 1 : 1 - Math.exp(-dt / 0.05);
+      shown = [shown[0] + (fused[0] - shown[0]) * k, shown[1] + (fused[1] - shown[1]) * k];
+      est.setAttribute('transform', `translate(${shown[0].toFixed(1)} ${shown[1].toFixed(1)})`);
+      if (t > nextTrack) {
+        nextTrack = t + 70;
+        track.push(shown.slice());
+        if (track.length > 28) track.shift();
+      }
+    } else if (track.length && t > nextTrack) { nextTrack = t + 70; track.shift(); }
+    trackEl.setAttribute('points', track.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '));
+    for (const g of dots) {
+      const a = Math.max(0, 1 - (t - g.t0) / 900);
+      if (g.a !== a) { g.a = a; g.el.setAttribute('opacity', (a * 0.6).toFixed(2)); }
     }
 
     // the fused classifier: certain inside, unsure near a wall from outside, sure of nothing far away
@@ -915,12 +1096,12 @@ $('[data-carrier-toggle]')?.addEventListener('click', (e) => {
     // the phone advertises; it changes its address every so often and the census doesn't care
     if (you && t > nextRot) { rotate(); nextRot = t + 6000 + Math.random() * 3000; }
     if (you && t > nextAdv) {
-      nextAdv = t + 180 + Math.random() * 220;
+      nextAdv = t + 320 + Math.random() * 380;
       sound.adv(NODES.map(([nx], i) => ({ pan: (nx - 100) / 90, db: rssiAt(i, you[0], you[1]) })));
     }
 
     fig.classList.toggle('sensing', !!you);
-    if (you || p > 0.025) raf = requestAnimationFrame(frame);
+    if (you || p > 0.025 || track.length) raf = requestAnimationFrame(frame);
     else last = 0;
   }
   const wake = () => { if (!raf) raf = requestAnimationFrame(frame); };
@@ -1212,13 +1393,13 @@ function openReveal(trigger) {
   opener = trigger instanceof HTMLElement ? trigger : (active instanceof HTMLElement && active !== document.body ? active : signalBtn);
   dialog.className = '';
   bdState.textContent = 'reactivating';
-  sound.levels(0, 0);
+  sound.hush(true);
   dialog.showModal();
   ecg.resize();
   story.scrollTop = 0;
   store.set('lk.lastBeat', String(Date.now()));
 
-  if (reduceMotion.matches) { stage('s-dawn', 'flying'); stage('s-story'); sound.dawn(true); story.focus({ preventScroll: true }); return; }
+  if (reduceMotion.matches) { stage('s-dawn', 'flying'); stage('s-story'); story.focus({ preventScroll: true }); return; }
 
   const t0 = performance.now();
   const hum = (t) => { drawEcg('hum', t - t0); ecgRaf = requestAnimationFrame(hum); };
@@ -1236,7 +1417,7 @@ function openReveal(trigger) {
     };
     ecgRaf = requestAnimationFrame(sweep);
   });
-  at(3500, () => { stage('s-dawn', 'flying'); sound.dawn(true); });
+  at(3500, () => stage('s-dawn', 'flying'));
   at(5200, () => {
     stage('s-story');
     if (document.activeElement === dialog || document.activeElement?.id === 'bd-close') story.focus({ preventScroll: true });
@@ -1248,7 +1429,7 @@ dialog.addEventListener('close', () => {
   timers = [];
   cancelAnimationFrame(ecgRaf);
   sound.flat(false);
-  sound.dawn(false);
+  sound.hush(false);
   dialog.className = '';
   reserve = 0; // the heart used what it gathered
   charged = false;
@@ -1325,48 +1506,12 @@ $('#play').addEventListener('click', () => sound.toggle());
       if (prov) prov.textContent = d.note || `Recorded, ${d.seconds} s.`;
     } catch { /* keep the illustration */ }
   }
-  if (m.harmonium_audio?.wire && m.harmonium_audio?.voice) harmoniumAudio(m.harmonium_audio);
+  if (m.harmonium_audio?.wire && m.harmonium_audio?.voice) {
+    try {
+      const raw = await Promise.all([m.harmonium_audio.wire, m.harmonium_audio.voice].map(async (f) => (await fetch(`data/${f}`)).arrayBuffer()));
+      sound.loadHarmonium(raw);
+      $('#harm-play').hidden = false;
+    } catch { /* keep the synthetic carrier */ }
+  }
 })();
 
-// Two takes of the same moment: what Discord carried, and what came out the
-// other end. Both loop together; the modem toggle crossfades between them.
-function harmoniumAudio({ wire: wireFile, voice: voiceFile }) {
-  const btn = $('#harm-play');
-  const fig = btn.closest('.sig-carrier');
-  let ctx = null, gains = null, srcs = [];
-  btn.hidden = false;
-  const mix = () => {
-    if (!gains) return;
-    const voice = fig.dataset.view === 'comb';
-    const t = ctx.currentTime;
-    gains[0].gain.setTargetAtTime(voice ? 0 : 0.9, t, 0.08);
-    gains[1].gain.setTargetAtTime(voice ? 0.9 : 0, t, 0.08);
-  };
-  const stop = () => {
-    srcs.forEach((x) => { try { x.stop(); } catch { /* done */ } });
-    srcs = [];
-    btn.textContent = 'play';
-    btn.setAttribute('aria-pressed', 'false');
-  };
-  new MutationObserver(mix).observe(fig, { attributes: true, attributeFilter: ['data-view'] });
-  setInterval(() => { if (srcs.length && tuner.lockedId() !== 'harmonium') stop(); }, 300);
-  btn.addEventListener('click', async () => {
-    if (srcs.length) { stop(); return; }
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    ctx ??= new AC();
-    await ctx.resume();
-    btn.textContent = '...';
-    try {
-      const bufs = await Promise.all([wireFile, voiceFile].map(async (f) => ctx.decodeAudioData(await (await fetch(`data/${f}`)).arrayBuffer())));
-      gains = bufs.map(() => { const g = ctx.createGain(); g.gain.value = 0; g.connect(ctx.destination); return g; });
-      const at = ctx.currentTime + 0.05;
-      srcs = bufs.map((b, i) => { const x = ctx.createBufferSource(); x.buffer = b; x.loop = true; x.connect(gains[i]); x.start(at); return x; });
-      mix();
-      btn.textContent = 'stop';
-      btn.setAttribute('aria-pressed', 'true');
-    } catch {
-      btn.textContent = 'could not load';
-    }
-  });
-}

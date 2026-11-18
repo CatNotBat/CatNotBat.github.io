@@ -332,7 +332,6 @@ dialog#better-days::backdrop { background: #000; }
   font-size: clamp(1.05rem, 1rem + .3vw, 1.2rem); line-height: 1.7; margin-bottom: 1.35em;
 }
 #better-days .story p:first-of-type { font-size: clamp(1.25rem, 1.1rem + .7vw, 1.6rem); line-height: 1.45; font-style: italic; }
-#better-days .last { display: block; margin-top: 2.5rem; font-style: italic; font-size: 1.6em; font-variation-settings: "opsz" 96, "SOFT" 80, "WONK" 1; color: #7b2a1c; }
 #better-days .close {
   position: absolute; right: var(--gutter); bottom: max(1.25rem, env(safe-area-inset-bottom));
   background: rgba(7, 11, 15, .82); color: var(--ink); border: 1px solid var(--ink-faint);
@@ -439,3 +438,35 @@ dialog#better-days::backdrop { background: #000; }
 .sig-room .census.c1.occupied { fill: var(--trace); }
 .sig-room .nodes rect { transition: fill .3s; }
 .sig-room.sensing .nodes rect { fill: rgba(88, 168, 159, .2); }
+
+/* harmonium: one key, and a live look at what you hear */
+.sig-carrier .scope { position: relative; }
+.sig-carrier .live { position: absolute; left: 0; right: 0; bottom: .25rem; width: 100%; height: 100%; opacity: 0; transition: opacity .5s; image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none; }
+.sig-carrier.playing .live { opacity: 1; }
+.sig-carrier.playing svg polyline { opacity: .12 !important; }
+.harm-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; margin-top: 1rem; }
+.harm-ctl .quiet-btn { margin-top: 0; }
+.key { display: flex; align-items: center; gap: .75rem; font-size: .75rem; color: var(--ink-mute); flex: 1 1 14rem; max-width: 22rem; }
+.key input { -webkit-appearance: none; appearance: none; flex: 1; height: 2.25rem; margin: 0; background: transparent; cursor: ew-resize; }
+.key input::-webkit-slider-runnable-track { height: 1px; background: var(--ink-faint); }
+.key input::-moz-range-track { height: 1px; background: var(--ink-faint); }
+.key input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 9px; height: 18px; margin-top: -8.5px; border: 1px solid var(--trace); background: var(--bg-0); }
+.key input::-moz-range-thumb { width: 9px; height: 18px; border: 1px solid var(--trace); border-radius: 0; background: var(--bg-0); }
+.key input:focus-visible { outline: none; }
+.key input:focus-visible::-webkit-slider-thumb { background: var(--trace); }
+.key input:focus-visible::-moz-range-thumb { background: var(--trace); }
+.sig-room .ph { fill: var(--trace); }
+.sig-room .track { fill: none; stroke: var(--trace); stroke-width: .6; stroke-dasharray: .6 1.8; stroke-linecap: round; opacity: .45; }
+
+/* dns: ask anything */
+.resolve { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; margin: 0 0 1.25rem; }
+.resolve input, .resolve select {
+  font: 400 .8125rem var(--mono); color: var(--ink); background: transparent;
+  border: 0; border-bottom: 1px solid var(--ink-faint); padding: .35rem 0; min-height: 2.25rem; border-radius: 0;
+}
+.resolve input { flex: 1 1 10rem; min-width: 0; caret-color: var(--trace); }
+.resolve select { color: var(--ink-dim); cursor: pointer; }
+.resolve select option { background: var(--bg-1); }
+.resolve input:focus-visible, .resolve select:focus-visible { outline: none; border-bottom-color: var(--trace); }
+.resolve .quiet-btn { margin-top: 0; }
+.resolve[aria-busy="true"] .quiet-btn { color: var(--trace); }
