@@ -15,7 +15,7 @@ wait:   lw    t0, 8(s0)
         call  putd
         li    t2, 10
         sb    t2, 0(s0)
-        li    t2, 1400
+        li    t2, 2600
         sw    t2, 12(s0)
         j     wait
 
@@ -27,7 +27,7 @@ beat:   li    t2, 1
         sw    t2, 12(s0)
         sw    zero, 4(s0)
         sw    zero, 8(s0)
-        li    t2, 4000
+        li    t2, 5000
         sw    t2, 12(s0)
         j     wait
 
@@ -47,6 +47,6 @@ putd:   li    t4, 10
         sb    t6, 0(s0)
         ret
 
-boot:   .asciz "beakless\nwaiting for hydrogen\n"
+boot:   .asciz "waiting for hydrogen\n"
 h2:     .asciz "h2 "
 thump:  .asciz "\n  thump\n\n"

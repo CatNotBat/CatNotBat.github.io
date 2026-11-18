@@ -37,7 +37,6 @@
     <div class="r-state" role="group" aria-label="state">
       <span class="k" aria-hidden="true">state</span>
       <button type="button" data-state="listening" aria-pressed="true">listening</button>
-      <button type="button" data-state="transmitting" aria-pressed="false">transmitting</button>
       <button type="button" data-state="dormant" aria-pressed="false">dormant</button>
     </div>
     <button type="button" class="sound" id="sound" aria-pressed="false">sound off</button>
@@ -115,10 +114,13 @@
       <p class="st-id"><span>440 Hz</span> a</p>
       <h2 id="a-h" class="sr-only">An editable pattern that plays as music</h2>
       <div class="code">
-        <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" rows="5" aria-label="Pattern" aria-describedby="code-err">50 ~ [50 50] ~
+        <div class="code-wrap">
+        <pre class="code-hl" id="code-hl" aria-hidden="true"></pre>
+        <textarea id="code" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" rows="5" aria-label="Pattern" aria-describedby="code-err">50 ~ [50 50] ~
 &lt;a4 c5&gt; [~ e5] &lt;g4 [b4 d5]&gt; ~
 ~ click*3 ~ &lt;click*2 chirp&gt;
 ~ ~ ~ &lt;~ ~ ~ 1420.405&gt;</textarea>
+        </div>
         <p class="code-err" id="code-err" aria-live="polite"></p>
       </div>
       <button type="button" class="quiet-btn" id="play" aria-pressed="false">play</button>
@@ -191,7 +193,7 @@ wait:   lw    t0, 8(s0)
         call  putd
         li    t2, 10
         sb    t2, 0(s0)
-        li    t2, 1400
+        li    t2, 2600
         sw    t2, 12(s0)
         j     wait
 
@@ -203,7 +205,7 @@ beat:   li    t2, 1
         sw    t2, 12(s0)
         sw    zero, 4(s0)
         sw    zero, 8(s0)
-        li    t2, 4000
+        li    t2, 5000
         sw    t2, 12(s0)
         j     wait
 
@@ -223,7 +225,7 @@ putd:   li    t4, 10
         sb    t6, 0(s0)
         ret
 
-boot:   .asciz "beakless\nwaiting for hydrogen\n"
+boot:   .asciz "waiting for hydrogen\n"
 h2:     .asciz "h2 "
 thump:  .asciz "\n  thump\n\n"</pre>
           <textarea id="fw-edit" hidden spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Edit the firmware" aria-describedby="fw-err"></textarea>
@@ -233,6 +235,8 @@ thump:  .asciz "\n  thump\n\n"</pre>
           <p class="led-row"><span class="led" id="led" aria-hidden="true"></span><span id="mcu-state">off</span></p>
           <pre class="uart" id="uart" aria-label="Serial output"></pre>
           <div class="mcu-ctl">
+            <button type="button" class="quiet-btn" id="mcu-step" hidden>step</button>
+            <button type="button" class="quiet-btn" id="mcu-cont" hidden>continue</button>
             <button type="button" class="quiet-btn" id="mcu-zap">irradiate</button>
             <button type="button" class="quiet-btn" id="mcu-edit" aria-pressed="false">edit</button>
           </div>
@@ -242,8 +246,7 @@ thump:  .asciz "\n  thump\n\n"</pre>
 
     <section class="station st-text st-hidden" id="hydrogen" data-f="1.420405e9" data-k="freq" data-v="1420.405 MHz" data-name="hydrogen line" data-secret aria-labelledby="h-h">
       <p class="st-id"><span>1420.405 MHz</span> the hydrogen line</p>
-      <h2 id="h-h" data-decode>Cold hydrogen, whispering.</h2>
-      <p>Something else on this dial runs on it.</p>
+      <h2 id="h-h" class="sr-only">the hydrogen line</h2>
     </section>
 
     <section class="station st-text" id="mugs" data-f="4.8e14" data-k="light" data-v="480 THz" data-name="mugs" aria-labelledby="mugs-h">
@@ -263,27 +266,22 @@ thump:  .asciz "\n  thump\n\n"</pre>
       <button type="button" class="quiet-btn" data-reveal>wake it</button>
     </section>
 
-    <section class="station st-text st-transmit" id="transmit" data-panel aria-labelledby="contact-h">
-      <p class="st-id"><span>state</span> transmitting</p>
-      <h2 id="contact-h" data-decode>Say hi.</h2>
-      <ul class="links">
-        <li class="mail">
-          <span class="k">mail</span>
-          <span id="addr" class="addr" data-u="1puostaht" data-d="moc.liamg">enable JavaScript to see the address</span>
-          <button type="button" class="quiet-btn" id="copy" hidden>copy</button>
-          <span id="copied" class="copied" role="status"></span>
-        </li>
-        <li><span class="k">code</span> <a href="https://github.com/CatNotBat" rel="noopener noreferrer">github.com/CatNotBat</a></li>
-        <li><span class="k">work</span> <a href="https://www.linkedin.com/in/lev-keret" rel="noopener noreferrer">linkedin.com/in/lev-keret</a></li>
-      </ul>
-    </section>
   </div>
-  <p class="dormant-msg" aria-hidden="true">dormant. it spends most of its life like this.<span>esc wakes it early</span></p>
+  <p class="dormant-msg" aria-hidden="true">dormant. it spends most of its life like this.<span>tap to wake it</span></p>
   <p class="sr-only" id="announce" aria-live="polite"></p>
 </main>
 
 <footer class="foot">
-  <a href="#transmit" data-transmit>say hi</a>
+  <ul class="links" id="tx" aria-label="Contact">
+          <li class="mail">
+            <span class="k">tx</span>
+            <span id="addr" class="addr" data-u="1puostaht" data-d="moc.liamg">enable JavaScript to see the address</span>
+            <button type="button" class="quiet-btn" id="copy" hidden>copy</button>
+            <span id="copied" class="copied" role="status"></span>
+          </li>
+          <li><span class="k">code</span> <a href="https://github.com/CatNotBat" rel="noopener noreferrer">github.com/CatNotBat</a></li>
+          <li><span class="k">work</span> <a href="https://www.linkedin.com/in/lev-keret" rel="noopener noreferrer">linkedin.com/in/lev-keret</a></li>
+        </ul>
   <p class="interval">reactivation interval 4m–13y</p>
   <button type="button" id="signal" class="signal" data-reveal aria-haspopup="dialog">signal: <span id="signal-state">dormant</span></button>
   <!-- handwriting signature goes here once Lev provides a sample -->

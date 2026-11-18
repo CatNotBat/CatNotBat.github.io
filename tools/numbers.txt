@@ -1,0 +1,19 @@
+read flat. no emphasis. same pace for every pair, about one pair a second.
+leave a full breath between the groups. this is the qname of the real query
+in data/dns-and-birds-fly.json: and.birds.fly, as bytes.
+
+    zero three.
+
+    six one.     six echo.    six four.
+
+    zero five.
+
+    six two.     six niner.   seven two.   six four.   seven three.
+
+    zero three.
+
+    six six.     six charlie. seven niner.
+
+    zero zero.
+
+(pause three seconds, then read it all once more, then stop. no sign-off.)

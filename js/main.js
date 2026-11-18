@@ -33,7 +33,7 @@ function atom(tok) {
   if (WORDS.has(tok)) return { t: 'sym', v: tok };
   throw new Error(`no such thing as "${tok}"`);
 }
-function parseLine(src) {
+function parseLine(src, lineNo = 0) {
   let i = 0;
   const ws = () => { while (i < src.length && /\s/.test(src[i])) i++; };
   function group(end) {
@@ -57,8 +57,11 @@ function parseLine(src) {
     else {
       const m = /^[A-Za-z0-9.~#_-]+/.exec(src.slice(i));
       if (!m) throw new Error(`stray ${src[i]}`);
+      const at = i;
       i += m[0].length;
       node = atom(m[0]);
+      node.pos = `${lineNo}:${at}`;
+      node.end = i;
     }
     while (src[i] === '*') {
       i++;
@@ -84,25 +87,68 @@ function query(node, cycle, b, d, out) {
 }
 const music = (() => {
   const ta = $('#code');
+  const hl = $('#code-hl');
   const err = $('#code-err');
   let layers = [];
+  const spans = new Map();
+  const timers = new Map();
+
+  // a transparent copy of the text sits under the textarea; its spans light up as they play
+  function mirror(tokens) {
+    spans.clear();
+    const frag = document.createDocumentFragment();
+    ta.value.split('\n').forEach((line, n) => {
+      let at = 0;
+      for (const t of (tokens.get(n) ?? []).sort((x, y) => x.s - y.s)) {
+        if (t.s > at) frag.append(line.slice(at, t.s));
+        const sp = document.createElement('span');
+        sp.textContent = line.slice(t.s, t.e);
+        spans.set(`${n}:${t.s}`, sp);
+        frag.append(sp);
+        at = t.e;
+      }
+      frag.append(`${line.slice(at)}\n`);
+    });
+    hl.replaceChildren(frag);
+  }
+  function collect(node, out) {
+    if (node.pos) out.push({ s: Number(node.pos.split(':')[1]), e: node.end });
+    node.ch?.forEach((c) => collect(c, out));
+    return out;
+  }
   function compile() {
     const next = [];
+    const tokens = new Map();
     const lines = ta.value.split('\n');
+    let bad = '';
     for (let n = 0; n < lines.length; n++) {
-      const line = lines[n].replace(/\/\/.*$/, '').trim();
-      if (!line) continue;
-      try { next.push(parseLine(line)); }
-      catch (e) { err.textContent = `line ${n + 1}: ${e.message}`; return; }
+      const line = lines[n].replace(/\/\/.*$/, '');
+      if (!line.trim()) continue;
+      try {
+        const tree = parseLine(line, n);
+        next.push(tree);
+        tokens.set(n, collect(tree, []));
+      } catch (e) { bad ||= `line ${n + 1}: ${e.message}`; }
     }
-    err.textContent = '';
-    layers = next;
+    err.textContent = bad;
+    if (!bad) layers = next;
+    mirror(tokens);
   }
-  let t = 0;
-  ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(compile, 180); });
+  const sync = () => { hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; };
+  ta.addEventListener('scroll', sync);
+  ta.addEventListener('input', () => { compile(); sync(); });
   ta.addEventListener('keydown', (e) => e.stopPropagation());
   compile();
-  return { events(cycle) { const out = []; layers.forEach((l) => query(l, cycle, 0, 1, out)); return out; } };
+  return {
+    events(cycle) { const out = []; layers.forEach((l) => query(l, cycle, 0, 1, out)); return out; },
+    mark(pos, dur) {
+      const sp = spans.get(pos);
+      if (!sp) return;
+      sp.classList.add('on');
+      clearTimeout(timers.get(sp));
+      timers.set(sp, setTimeout(() => sp.classList.remove('on'), clamp(dur * 900, 70, 600)));
+    },
+  };
 })();
 
 /* ================================================================== *
@@ -181,22 +227,27 @@ const sound = (() => {
       sweep(); timers.push(setInterval(sweep, 1500));
     },
     a440() {
+      // look only 150 ms ahead, so an edit is heard almost as soon as it is typed
       const CYCLE = 2.4;
-      const t0 = ctx.currentTime + 0.08;
-      let next = 0;
+      const t0 = ctx.currentTime + 0.06;
+      let until = 0;
       const sched = () => {
-        while (t0 + next * CYCLE < ctx.currentTime + 0.3) {
-          for (const e of music.events(next)) {
-            const at = t0 + (next + e.b) * CYCLE;
+        const end = (ctx.currentTime + 0.15 - t0) / CYCLE;
+        if (end <= until) return;
+        for (let c = Math.floor(until); c < Math.ceil(end); c++) {
+          for (const e of music.events(c)) {
+            const b = c + e.b;
+            if (b < until || b >= end) continue;
+            const at = t0 + b * CYCLE;
             const dur = Math.min(e.d * CYCLE, 1.6);
             play(e.v, at, dur);
-            setTimeout(() => wire.packet(), Math.max(0, (at - ctx.currentTime) * 1000));
+            setTimeout(() => { wire.packet(); music.mark(e.v.pos, dur); }, Math.max(0, (at - ctx.currentTime) * 1000));
           }
-          next++;
         }
+        until = end;
       };
       sched();
-      timers.push(setInterval(sched, 60));
+      timers.push(setInterval(sched, 40));
     },
     gamma() {
       geiger.alive = true;
@@ -493,7 +544,6 @@ const tuner = (() => {
   const N = stations.length;
   stations.forEach((s, i) => { s.pos = Math.round(60 + (i * 880) / (N - 1)); });
   const byId = new Map(stations.map((s) => [s.id, s]));
-  const transmit = $('#transmit');
   const CAPTURE = 60;
   const LOCK = 6;
 
@@ -539,7 +589,6 @@ const tuner = (() => {
   let locked = null;
   let lastAnnounced = null;
   stations.forEach((s) => { s.el.hidden = s !== shown; });
-  transmit.hidden = true;
 
   function nearest(p) {
     let best = stations[0];
@@ -566,7 +615,7 @@ const tuner = (() => {
     const sig = clamp(1 - dist / CAPTURE, 0, 1);
     const isLocked = dist <= LOCK;
 
-    if (state !== 'transmitting') {
+    {
       if (sig > 0 && s !== shown) {
         scramble(shown, 0);
         shown.el.hidden = true;
@@ -655,21 +704,8 @@ const tuner = (() => {
     if (e.key === 'ArrowLeft') { e.preventDefault(); stepStation(-1); }
   });
 
-  function showTransmit(on) {
-    if (on) {
-      scramble(shown, 0);
-      shown.el.hidden = true;
-      display.classList.remove('static');
-      transmit.hidden = false;
-    } else {
-      transmit.hidden = true;
-      shown.el.hidden = false;
-      update();
-    }
-  }
-
   return {
-    update, tuneTo, glideTo, showTransmit, byId,
+    update, tuneTo, glideTo, byId,
     lockedId: () => locked?.id ?? null,
     refresh() { sound.station(nearest(Number(dial.value)).id); update(); },
     homePos: () => byId.get('home').pos,
@@ -677,7 +713,7 @@ const tuner = (() => {
 })();
 
 /* ================================================================== *
- * State: listening, transmitting, dormant.
+ * State: listening or dormant.
  * ================================================================== */
 let state = 'listening';
 const stateBtns = $$('[data-state]');
@@ -687,21 +723,16 @@ function setState(s) {
   state = s;
   document.body.dataset.state = s;
   stateBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.state === s)));
-  if (s === 'transmitting') tuner.showTransmit(true);
-  if (prev === 'transmitting') tuner.showTransmit(false);
-  if (s === 'dormant') { announce.textContent = 'Dormant. Move around to gather signal. Escape wakes it early.'; sound.levels(0.05, 0); }
+  if (s === 'dormant') { announce.textContent = 'Dormant. Tap or press Escape to wake it.'; sound.levels(0.05, 0); dormantSince = performance.now(); }
   if (prev === 'dormant') tuner.update();
 }
-stateBtns.forEach((b) => b.addEventListener('click', () => {
-  setState(b.dataset.state);
-  if (b.dataset.state === 'transmitting') display.focus({ preventScroll: false });
-}));
-$$('[data-transmit]').forEach((a) => a.addEventListener('click', (e) => {
-  e.preventDefault();
-  setState('transmitting');
-  display.scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start' });
-  display.focus({ preventScroll: true });
-}));
+stateBtns.forEach((b) => b.addEventListener('click', () => setState(b.dataset.state)));
+// a tap anywhere wakes it (moving around only gathers); a short grace so the click that put it to sleep doesn't wake it
+let dormantSince = 0;
+addEventListener('pointerdown', (e) => {
+  if (state !== 'dormant' || performance.now() - dormantSince < 400 || e.target.closest('[data-state]')) return;
+  setState('listening');
+});
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && state === 'dormant' && !dialog.open) setState('listening'); });
 
 /* ================================================================== *
@@ -757,10 +788,17 @@ const mcu = (() => {
   const stEl = $('#mcu-state');
   const uart = $('#uart');
   const editB = $('#mcu-edit');
+  const stepB = $('#mcu-step');
+  const contB = $('#mcu-cont');
+  const SPEED = 10; // instructions per second: slow enough to read along
+  const REGRX = new RegExp(`\\b(${ABI.join('|')}|x\\d{1,2})\\b`, 'g');
   let source = fw.textContent;
   let prog = null, cpu = null, lines = [], curLine = -1;
   let out = '', gpio = 0, sleepUntil = 0, acc = 0, last = 0;
+  let paused = false, skipLine = -1;
+  const bps = new Set();
   const hex = (v) => (v >>> 0).toString(16).padStart(8, '0');
+  const fmt = (v) => (Math.abs(v) < 100000 ? String(v) : `0x${hex(v)}`);
 
   const io = {
     read(off) { return off === 8 ? Math.round(reserve) : off === 4 ? gpio : 0; },
@@ -777,17 +815,87 @@ const mcu = (() => {
     },
   };
 
+  function build() {
+    const code = new Set(prog.lineAt.values());
+    for (const n of [...bps]) if (!code.has(n)) bps.delete(n);
+    fw.replaceChildren(...source.split('\n').map((t, n) => {
+      const ln = document.createElement('span'); ln.className = 'ln';
+      let g;
+      if (code.has(n)) {
+        g = document.createElement('button');
+        g.type = 'button';
+        g.setAttribute('aria-label', `breakpoint on line ${n + 1}`);
+        g.setAttribute('aria-pressed', String(bps.has(n)));
+        g.addEventListener('click', () => {
+          if (bps.has(n)) bps.delete(n); else bps.add(n);
+          g.setAttribute('aria-pressed', String(bps.has(n)));
+        });
+      } else g = document.createElement('span');
+      g.className = 'bp';
+      const tx = document.createElement('span'); tx.textContent = t;
+      const ann = document.createElement('span'); ann.className = 'ann';
+      ln.append(g, tx, ann, '\n');
+      return ln;
+    }));
+    lines = [...fw.children];
+  }
+
   function flash() {
     try { prog = assemble(source); } catch (e) { err.textContent = e.message; return false; }
     err.textContent = `${prog.size} bytes`;
     cpu = new CPU(prog.image, io);
     out = ''; gpio = 0; sleepUntil = 0; acc = 0; curLine = -1;
-    fw.replaceChildren(...source.split('\n').map((t) => {
-      const sp = document.createElement('span'); sp.className = 'ln'; sp.textContent = `${t}\n`; return sp;
-    }));
-    lines = [...fw.children];
+    build();
+    resume(false);
     render();
     return true;
+  }
+
+  // while paused, the registers on the current line show their values; tap one to change it
+  function clearAnn() { fw.querySelectorAll('.ann').forEach((a) => a.replaceChildren()); }
+  function annotate() {
+    clearAnn();
+    const ln = prog.lineAt.get(cpu.pc);
+    const ann = lines[ln]?.querySelector('.ann');
+    if (!ann) return;
+    const names = [...new Set(source.split('\n')[ln].replace(/#.*/, '').match(REGRX) ?? [])].filter((r) => r !== 'zero');
+    for (const r of names) {
+      const i = ABI.includes(r) ? ABI.indexOf(r) : Number(r.slice(1));
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'val';
+      b.textContent = `${r}=${fmt(cpu.x[i])}`;
+      b.setAttribute('aria-label', `${r} is ${cpu.x[i]}. Change it`);
+      b.addEventListener('click', () => poke(b, r, i));
+      ann.append(b);
+    }
+  }
+  function poke(b, r, i) {
+    const inp = document.createElement('input');
+    inp.className = 'val-in';
+    inp.value = String(cpu.x[i]);
+    inp.setAttribute('aria-label', `new value for ${r}`);
+    inp.inputMode = 'numeric';
+    const done = (save) => {
+      if (save) {
+        const v = /^-?0x[0-9a-f]+$/i.test(inp.value.trim()) ? Number.parseInt(inp.value, 16) : Number(inp.value);
+        if (Number.isFinite(v) && i !== 0) cpu.x[i] = v | 0;
+      }
+      annotate();
+    };
+    inp.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') done(true);
+      if (e.key === 'Escape') { e.preventDefault(); done(false); }
+    });
+    inp.addEventListener('blur', () => done(true), { once: true });
+    b.replaceWith(inp);
+    inp.focus(); inp.select();
+  }
+
+  function pause() { paused = true; stepB.hidden = false; contB.hidden = false; annotate(); render(); }
+  function resume(skip = true) {
+    paused = false; stepB.hidden = true; contB.hidden = true; clearAnn();
+    skipLine = skip ? prog.lineAt.get(cpu.pc) ?? -1 : -1;
   }
 
   function render() {
@@ -807,24 +915,32 @@ const mcu = (() => {
     if (uart.textContent !== u) uart.textContent = u;
     led.toggleAttribute('data-on', !!gpio);
     const sleeping = performance.now() < sleepUntil;
-    stEl.textContent = cpu.halted ?? (sleeping ? 'asleep' : `pc ${hex(cpu.pc)}`);
+    stEl.textContent = cpu.halted ?? (paused ? `paused, line ${ln + 1}` : sleeping ? 'asleep' : 'awake');
   }
 
-  const active = () => tuner.lockedId() === 'rv32' && state === 'listening' && !dialog.open && !document.hidden && !ed.matches(':not([hidden])');
+  const active = () => tuner.lockedId() === 'rv32' && state === 'listening' && !dialog.open && !document.hidden && ed.hidden;
   function loop(t) {
     requestAnimationFrame(loop);
     const dt = Math.min(100, t - last);
     last = t;
     if (!cpu || !active()) return;
-    if (!cpu.halted && t >= sleepUntil) {
-      acc += (dt / 1000) * 22;
+    if (!cpu.halted && !paused && t >= sleepUntil) {
+      acc += (dt / 1000) * SPEED;
       let n = Math.floor(acc);
       acc -= n;
-      while (n-- > 0 && !cpu.halted && performance.now() >= sleepUntil) cpu.step();
+      while (n-- > 0 && !cpu.halted && !paused && performance.now() >= sleepUntil) {
+        const ln = prog.lineAt.get(cpu.pc);
+        if (skipLine !== -1 && ln !== skipLine) skipLine = -1;
+        if (bps.has(ln) && ln !== skipLine) { pause(); break; }
+        cpu.step();
+      }
     }
     render();
   }
   requestAnimationFrame(loop);
+
+  stepB.addEventListener('click', () => { cpu.step(); annotate(); render(); });
+  contB.addEventListener('click', () => { resume(); render(); });
 
   const zap = $('#mcu-zap');
   let zapT = 0;
@@ -976,7 +1092,7 @@ if (hash === 'better-days') {
   setTimeout(() => openReveal(signalBtn), 400);
 } else if (hash === 'transmit') {
   tuner.glideTo(tuner.homePos(), 0);
-  setState('transmitting');
+  $('#tx').scrollIntoView();
 } else if (tuner.byId.has(hash) && hash !== 'gamma') {
   tuner.tuneTo(hash, 0);
 } else {
@@ -989,7 +1105,7 @@ if (hash === 'better-days') {
 addEventListener('hashchange', () => {
   const h = location.hash.slice(1);
   if (h === 'better-days') openReveal(signalBtn);
-  else if (h === 'transmit') setState('transmitting');
+  else if (h === 'transmit') $('#tx').scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth' });
   else if (tuner.byId.has(h) && h !== tuner.lockedId()) tuner.tuneTo(h);
 });
 
