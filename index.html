@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Lev Keret</title>
+<meta name="description" content="Lev Keret's website is a radio. Turn the dial.">
+<meta name="theme-color" content="#070b0f">
+<meta property="og:title" content="Lev Keret">
+<meta property="og:description" content="This website is a radio. Turn the dial.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://catnotbat.github.io/">
+<meta property="og:image" content="https://catnotbat.github.io/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..640,0..100,0..1;1,9..144,300..640,0..100,0..1&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="css/site.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<!--
+  hello, source reader.
+  nothing here phones home. no analytics, no trackers, no cookies.
+  the wires hum at 50 Hz because that's what the wall does in Tel Aviv.
+  there is one more thing on this page. it needs three letters.
+-->
+<a class="skip" href="#display">Skip to the content</a>
+
+<header class="instrument">
+  <p class="wordmark">Lev Keret</p>
+  <div class="readout">
+    <div class="r-freq"><label for="dial" id="tune-k">freq</label> <output id="tune-v" for="dial">2.402 GHz</output></div>
+    <div class="r-sig" aria-hidden="true"><span class="k">sig</span> <span class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></span></div>
+    <div class="r-state" role="group" aria-label="state">
+      <span class="k" aria-hidden="true">state</span>
+      <button type="button" data-state="listening" aria-pressed="true">listening</button>
+      <button type="button" data-state="transmitting" aria-pressed="false">transmitting</button>
+      <button type="button" data-state="dormant" aria-pressed="false">dormant</button>
+    </div>
+    <div class="reserve" aria-hidden="true"><span class="k">h&#8322; reserve</span> <span><span id="reserve">0</span>%</span></div>
+    <div class="reserve r-last" aria-hidden="true"><span class="k">last beat</span> <span id="last-beat">never</span></div>
+    <div class="reserve" aria-hidden="true"><span class="k">log</span> <span id="logbook">0/8</span></div>
+    <button type="button" class="sound" id="sound" aria-pressed="false">sound off</button>
+  </div>
+</header>
+
+<main>
+  <div class="receiver">
+    <div class="wires" aria-hidden="true">
+      <svg class="wires-poster" viewBox="0 0 1000 240" preserveAspectRatio="none">
+        <path d="M-10 34 Q 500 140 1010 22" />
+        <path d="M-10 70 Q 480 196 1010 58" />
+        <path d="M-10 104 Q 340 172 620 126 Q 638 145 632 238" class="cut" />
+      </svg>
+      <canvas id="wire"></canvas>
+    </div>
+    <div class="dial">
+      <div class="scale" id="scale" aria-hidden="true"></div>
+      <input type="range" id="dial" min="0" max="1000" step="1" value="500" aria-label="Tune the receiver">
+    </div>
+    <nav class="presets" aria-label="Stations">
+      <a href="#hum" data-preset="hum"><span>50 Hz</span> the hum</a>
+      <a href="#dns" data-preset="dns"><span>53</span> dns resolver</a>
+      <a href="#harmonium" data-preset="harmonium"><span>voice</span> harmonium</a>
+      <a href="#home" data-preset="home"><span>2.402 GHz</span> home</a>
+      <a href="#roomsense" data-preset="roomsense"><span>24 GHz</span> roomsense</a>
+      <a href="#mugs" data-preset="mugs"><span>480 THz</span> mugs</a>
+      <a href="#gamma" data-preset="gamma"><span>10&#185;&#8313; Hz</span> ?</a>
+    </nav>
+  </div>
+
+  <div class="display" id="display" tabindex="-1">
+    <p class="nocarrier-msg" aria-hidden="true">no carrier</p>
+
+    <section class="station st-home" id="home" data-f="2.402e9" data-k="freq" data-v="2.402 GHz" data-name="home" aria-labelledby="statement">
+      <h1 id="statement" data-decode>This is a radio.</h1>
+      <p class="sub">Everything I've made is on here somewhere. Turn the dial.</p>
+      <p class="hint">Drag it, use the arrow keys, or tap a station. Some stations aren't on the list.</p>
+    </section>
+
+    <section class="station st-text" id="hum" data-f="50" data-k="freq" data-v="50 Hz" data-name="the hum" aria-labelledby="hum-h">
+      <p class="st-id"><span>50 Hz</span> the hum</p>
+      <h2 id="hum-h" data-decode>Hi, I'm Lev.</h2>
+      <p>I live in Tel Aviv, where the wall hums at 50&nbsp;Hz. The wires at the top of this page are humming along with it. You can pluck them.</p>
+      <p>I like taking things apart down to the bytes and the waveforms, mostly to find out whether a dumb idea works. A VPN running bare on a microcontroller. A voice call smuggled inside another voice call. Right now it's drones talking MAVLink, point clouds, and too many ESP32s.</p>
+    </section>
+
+    <section class="station ch" id="roomsense" data-f="24e9" data-k="radar" data-v="24 GHz" data-name="roomsense" aria-labelledby="room-h">
+      <div class="ch-text">
+        <p class="st-id"><span>24 GHz</span> occupancy</p>
+        <h2 id="room-h" data-decode><a href="https://github.com/CatNotBat/roomsense" rel="noopener noreferrer">roomsense</a></h2>
+        <p>Count the people in a room without a camera, and without tracking anyone's phone. An ESP32 sits in each corner, listening to the room's Bluetooth noise and bouncing 24&nbsp;GHz radar off whoever's in there. It reads the room, not the phones, so it doesn't care when they shuffle their MAC addresses.</p>
+        <p class="figure-line"><strong>93.8%</strong> right in cross-validation, on four $70 boards.</p>
+        <ul class="stack"><li>Python</li><li>ESP32</li><li>mmWave radar</li><li>BLE</li><li>Random Forest</li><li>MQTT</li></ul>
+      </div>
+      <figure class="sig sig-room">
+          <svg viewBox="0 0 200 160" role="img" aria-labelledby="room-cap">
+            <defs><clipPath id="room-clip"><rect x="20" y="14" width="160" height="132" /></clipPath></defs>
+            <rect x="20" y="14" width="160" height="132" class="wall" />
+            <g class="rings" clip-path="url(#room-clip)">
+              <circle cx="24" cy="18" r="40" /><circle cx="24" cy="18" r="80" />
+              <circle cx="176" cy="18" r="52" /><circle cx="176" cy="18" r="96" />
+              <circle cx="24" cy="142" r="60" /><circle cx="24" cy="142" r="110" />
+              <circle cx="176" cy="142" r="46" /><circle cx="176" cy="142" r="88" />
+            </g>
+            <g class="nodes"><rect x="18" y="12" width="12" height="12"/><rect x="170" y="12" width="12" height="12"/><rect x="18" y="136" width="12" height="12"/><rect x="170" y="136" width="12" height="12"/></g>
+          </svg>
+          <figcaption id="room-cap">Schematic. Four nodes, one per corner, listening to the room instead of the phones in it.</figcaption>
+        </figure>
+    </section>
+
+    <section class="station ch" id="harmonium" data-f="1000" data-k="band" data-v="voice" data-name="harmonium" aria-labelledby="harm-h">
+      <div class="ch-text">
+        <p class="st-id"><span>voice band</span> modulated carrier</p>
+        <h2 id="harm-h" data-decode><a href="https://github.com/CatNotBat/harmonium" rel="noopener noreferrer">harmonium</a></h2>
+        <p>A secret voice call hidden inside a normal Discord call. Your voice gets squeezed through Codec&nbsp;2, encrypted with WireGuard, then turned into noise by an OFDM modem I wrote. Discord carries the noise and has no idea. The trick is that WireGuard doesn't care what carries its packets, even a voice chat.</p>
+        <ul class="stack"><li>Rust</li><li>DSP</li><li>WireGuard</li><li>Codec 2</li><li>OFDM</li></ul>
+      </div>
+      <figure class="sig sig-carrier" data-view="noise">
+          <svg viewBox="0 0 240 60" role="img" aria-labelledby="carrier-cap">
+            <polyline class="noise" points="0,37.3 2,36.5 4,34.4 6,38.1 8,34.3 10,35.0 12,41.6 14,37.7 16,33.0 18,35.6 20,37.9 22,38.5 24,39.7 26,35.8 28,34.4 30,31.9 32,36.6 34,28.2 36,34.1 38,41.1 40,44.7 42,36.6 44,34.8 46,28.4 48,35.3 50,40.8 52,41.2 54,40.0 56,46.8 58,37.1 60,44.0 62,40.2 64,38.1 66,32.7 68,34.4 70,33.5 72,36.6 74,30.8 76,39.8 78,36.3 80,41.2 82,40.3 84,35.2 86,38.5 88,45.0 90,36.7 92,38.5 94,41.0 96,32.6 98,47.6 100,43.6 102,47.0 104,37.4 106,39.0 108,31.1 110,44.8 112,43.3 114,37.7 116,39.1 118,40.4 120,34.1 122,36.9 124,30.2 126,40.7 128,34.6 130,39.1 132,35.0 134,37.9 136,35.8 138,32.8 140,40.5 142,35.3 144,37.3 146,42.6 148,41.8 150,33.6 152,36.9 154,37.9 156,33.6 158,40.2 160,42.0 162,35.7 164,41.5 166,40.1 168,35.2 170,32.9 172,33.2 174,36.4 176,37.0 178,38.8 180,37.8 182,35.1 184,42.9 186,31.4 188,40.5 190,33.1 192,40.7 194,36.9 196,35.2 198,36.2 200,44.8 202,36.0 204,40.8 206,46.4 208,39.2 210,35.3 212,36.9 214,37.3 216,28.8 218,33.4 220,39.9 222,36.1 224,41.5 226,32.3 228,38.1 230,40.0 232,39.2 234,36.9 236,46.6 238,33.4 240,34.5"/>
+            <polyline class="comb" points="0,46.5 2,41.7 4,49.0 6,42.6 8,46.2 10,45.3 12,47.1 14,50.0 16,45.9 18,45.1 20,47.2 22,47.2 24,41.4 26,48.0 28,48.4 30,44.6 32,48.8 34,48.6 36,47.1 38,47.7 40,46.2 42,41.7 44,46.0 46,43.7 48,45.3 50,48.7 52,47.7 54,44.3 56,48.7 58,46.5 60,46.4 62,43.3 64,47.1 66,41.8 68,49.4 70,13.7 72,26.8 74,16.2 76,31.1 78,16.7 80,27.7 82,15.5 84,32.2 86,17.3 88,31.6 90,16.2 92,29.4 94,15.3 96,30.5 98,14.8 100,30.3 102,17.6 104,30.9 106,15.9 108,32.5 110,16.5 112,33.2 114,17.2 116,25.6 118,14.7 120,30.0 122,17.6 124,31.9 126,17.6 128,31.6 130,16.6 132,29.5 134,17.4 136,27.8 138,15.7 140,28.7 142,18.0 144,26.0 146,14.6 148,30.6 150,16.6 152,29.3 154,14.1 156,26.7 158,16.5 160,28.3 162,16.6 164,33.8 166,17.5 168,30.5 170,14.5 172,50.4 174,46.2 176,49.6 178,45.1 180,44.8 182,44.7 184,47.2 186,48.8 188,46.4 190,44.2 192,41.6 194,45.2 196,45.5 198,47.3 200,47.2 202,47.3 204,44.5 206,47.2 208,53.3 210,45.1 212,47.2 214,44.5 216,48.8 218,44.0 220,46.8 222,46.9 224,45.1 226,46.1 228,39.1 230,44.9 232,44.6 234,49.9 236,44.6 238,48.5 240,47.2"/>
+          </svg>
+          <figcaption id="carrier-cap"><span class="when-noise">What Discord hears.</span><span class="when-comb">What the modem hears.</span> An illustration, not a capture.</figcaption>
+          <button type="button" class="quiet-btn" aria-pressed="false" data-carrier-toggle>listen as the modem</button>
+        </figure>
+    </section>
+
+    <section class="station ch" id="dns" data-f="53" data-k="port" data-v="udp/53" data-name="dns resolver" aria-labelledby="dns-h">
+      <div class="ch-text">
+        <p class="st-id"><span>udp/53</span> query, response</p>
+        <h2 id="dns-h" data-decode><a href="https://github.com/CatNotBat/DNS-client" rel="noopener noreferrer">dns resolver</a></h2>
+        <p>A DNS resolver in C with no libraries. Raw UDP sockets, RFC&nbsp;1035 open in the other window, every byte parsed by hand. Next to this is a real query I sent while making this page. Turns out <code>.fly</code> is a real top-level domain. <code>birds.fly</code> isn't.</p>
+        <ul class="stack"><li>C</li><li>UDP sockets</li><li>RFC 1035</li></ul>
+        <p class="more"><a href="https://github.com/CatNotBat" rel="noopener noreferrer">more on GitHub</a></p>
+      </div>
+      <figure class="sig sig-dns">
+          <div class="hex" tabindex="0" role="group" aria-label="Hex dump of a real DNS query for and.birds.fly and its NXDOMAIN response">
+<pre><span class="dir">asked</span>
+<span class="off">0000</span>  4c 6b <em>01 00</em> 00 01 00 00 00 <em>00</em> 00 00 <b>03 61 6e 64</b>
+<span class="off">0010</span>  <b>05 62 69 72 64 73 03 66 6c 79 00</b> 00 01 00 01
+
+<span class="dir">answer</span>
+<span class="off">0000</span>  4c 6b <em>81 83</em> 00 01 00 00 00 <em>01</em> 00 00 <b>03 61 6e 64</b>
+<span class="off">0010</span>  <b>05 62 69 72 64 73 03 66 6c 79 00</b> 00 01 00 01
+<span class="off">  +71</span>  authority  fly.  SOA  ns03.domaincontrol.com
+
+<span class="dir">qname</span>   <b>and.birds.fly</b>
+<span class="dir">rcode</span>   <em>3</em>  NXDOMAIN</pre>
+          </div>
+          <figcaption>18 November 2026, to 1.1.1.1. The answer is rcode 3: no such domain.</figcaption>
+          <button type="button" class="quiet-btn" data-reveal>disagree</button>
+        </figure>
+    </section>
+
+    <section class="station st-text st-hidden" id="hydrogen" data-f="1.420405e9" data-k="freq" data-v="1420.405 MHz" data-name="hydrogen line" data-secret aria-labelledby="h-h">
+      <p class="st-id"><span>1420.405 MHz</span> the hydrogen line</p>
+      <h2 id="h-h" data-decode>You found the hydrogen line.</h2>
+      <p>Cold hydrogen all over the galaxy whispers at exactly this frequency, and radio telescopes spend their nights listening for it. Something else on this dial runs on hydrogen too.</p>
+    </section>
+
+    <section class="station st-text" id="mugs" data-f="4.8e14" data-k="light" data-v="red, 480 THz" data-name="mugs" aria-labelledby="mugs-h">
+      <p class="st-id"><span>480 THz</span> visible, red</p>
+      <h2 id="mugs-h" data-decode>Not everything here has firmware.</h2>
+      <p>I paint mugs. A white one with red squid tentacles crawling up the side, and a green dinosaur. They live up here in visible light because they're the only things on the dial you look at with your eyes.</p>
+      <figure class="nocarrier">
+        <div class="snow" aria-hidden="true"></div>
+        <figcaption>No carrier yet. A scan of the squid is coming.</figcaption>
+      </figure>
+    </section>
+
+    <section class="station st-text st-gamma" id="gamma" data-f="3e19" data-k="freq" data-v="3&#215;10&#185;&#8313; Hz" data-name="gamma" aria-labelledby="gamma-h">
+      <p class="st-id"><span>3&#215;10&#185;&#8313; Hz</span> gamma</p>
+      <h2 id="gamma-h" data-decode>It's warm up here.</h2>
+      <p>Too much radiation for anything to live. Almost. Hold still.</p>
+      <p class="dwell" id="dwell" aria-hidden="true"></p>
+      <button type="button" class="quiet-btn" data-reveal>wake it</button>
+    </section>
+
+    <section class="station st-text st-transmit" id="transmit" data-panel aria-labelledby="contact-h">
+      <p class="st-id"><span>state</span> transmitting</p>
+      <h2 id="contact-h" data-decode>Say hi.</h2>
+      <ul class="links">
+        <li class="mail">
+          <span class="k">mail</span>
+          <span id="addr" class="addr" data-u="1puostaht" data-d="moc.liamg">enable JavaScript to see the address</span>
+          <button type="button" class="quiet-btn" id="copy" hidden>copy</button>
+          <span id="copied" class="copied" role="status"></span>
+        </li>
+        <li><span class="k">code</span> <a href="https://github.com/CatNotBat" rel="noopener noreferrer">github.com/CatNotBat</a></li>
+        <li><span class="k">work</span> <a href="https://www.linkedin.com/in/lev-keret" rel="noopener noreferrer">linkedin.com/in/lev-keret</a></li>
+      </ul>
+    </section>
+  </div>
+  <p class="dormant-msg" aria-hidden="true">dormant. it spends most of its life like this.<span>esc wakes it early</span></p>
+  <p class="sr-only" id="announce" aria-live="polite"></p>
+</main>
+
+<footer class="foot">
+  <a href="#transmit" data-transmit>say hi</a>
+  <p class="interval">reactivation interval 4m–13y</p>
+  <button type="button" id="signal" class="signal" data-reveal aria-haspopup="dialog">signal: <span id="signal-state">dormant</span></button>
+  <!-- handwriting signature goes here once Lev provides a sample -->
+</footer>
+
+<dialog id="better-days" aria-labelledby="bd-title">
+  <div class="dawn" aria-hidden="true"></div>
+  <canvas id="ecg" aria-hidden="true"></canvas>
+  <p class="bd-state" aria-hidden="true"><span>state</span> <span id="bd-state">reactivating</span></p>
+  <article class="story">
+    <h2 id="bd-title">Better days</h2>
+    <p>The beakless green feather was never meant to see better days.</p>
+    <p>After the world underwent a nuclear holocaust most animals ceased to exist; the ones that didn't went through changes so drastic you couldn't even call them the same animal. The beakless green feather is an example of that. Its continuation of the green feather species is only by name and a couple of DNA mutations that tell us they are somewhat related, given that there is nothing green or feathered about the beakless. Its body works like a small atomic battery, turning the radiation from its surroundings into usable energy, and feathers would only hurt the efficiency of the process — so would eyes, ears, or any other sensory organs. Even today nobody knows how they communicated or mated; it feels as if they just appeared one day. Estimations are that their lifespan was about 300 years, but nobody knows for sure.</p>
+    <p>The beakless's internal functions were a combination of several marvelous mechanics. One of its shticks was covering itself with water molecules placed so that the radiation splits them into hydrogen and peroxide, an order of higher potential energy, and then gathers them inwards — the new molecules small enough to seep through its flesh to the core, where they are mixed with bacteria that return them to their original form while the exothermic reaction feeds the body. Its heart stops itself when the hydrogen runs out, while keeping just enough charge to reactivate once enough has gathered again. This can happen anywhere between 4 minutes and 13 years apart, depending on how radioactive its surroundings are. Just like an electric automobile, it is speculated that it spends most of its lifespan dead.</p>
+    <p>Eventually the radiation dropped low enough for things that resembled old life to begin forming. The last beakless green feather stood on the wall of Jerusalem.</p>
+    <p>It couldn't see the green horizon stretching — a biological miracle, a win of life over death — so it started its engine one last time. The lack of radioactivity made it dizzy, and as it fell from the wall, for a second and a half the beakless performed something that had no survival benefit, something it wasn't programmed to do: reminding the world, and itself, that it is a bird. <span class="last">And birds fly.</span></p>
+  </article>
+  <button type="button" class="close" id="bd-close">go dormant</button>
+</dialog>
+</body>
+</html>

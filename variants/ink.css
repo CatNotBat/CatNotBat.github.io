@@ -1,0 +1,55 @@
+:root {
+  --bone: #efe9dd;
+  --ink: #111010;
+  --tone: #8d877c;
+  --blood: #b3191f;
+  --serif: "Fraunces", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bone); color: var(--ink); font: 400 1rem/1.5 var(--mono); padding: max(1rem, env(safe-area-inset-top)) max(1rem, 3vw) 3rem; }
+a { color: inherit; }
+.note { font-size: .75rem; margin: 0 0 1rem; }
+
+/* a manga page: thick borders, white gutters, panels of unequal weight */
+.page {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, auto);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.panel { border: 4px solid var(--ink); background: var(--bone); position: relative; overflow: hidden; }
+
+.p-sky { grid-column: 1 / -1; height: clamp(160px, 30svh, 320px);
+  /* screentone: real halftone dots, densest at the top */
+  background:
+    radial-gradient(circle, var(--ink) 1.1px, transparent 1.4px) 0 0 / 6px 6px,
+    var(--bone);
+  -webkit-mask-image: none;
+}
+.p-sky::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent, var(--bone) 85%); }
+.p-sky svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+.p-sky path { fill: none; stroke: var(--ink); stroke-width: 3.2; stroke-linecap: round; }
+.p-sky path.cut { stroke-width: 2.6; }
+.p-sky .pole { fill: var(--ink); }
+
+.p-read { grid-column: 1 / 3; padding: 1rem; display: flex; flex-direction: column; justify-content: flex-end; }
+.p-read .mono { margin: 0; font-size: .8125rem; }
+.p-name { grid-column: 3 / -1; padding: 1rem 1.25rem; display: flex; align-items: center; transform: rotate(-.6deg); background: var(--ink); color: var(--bone); }
+.name { margin: 0; font-family: var(--serif); font-weight: 900; font-variation-settings: "opsz" 144, "WONK" 1; font-size: clamp(2.2rem, 6vw, 4.5rem); line-height: .9; letter-spacing: -.03em; }
+
+.p-statement { grid-column: 1 / 5; padding: clamp(1rem, 3vw, 2.5rem); }
+.p-statement h1 { margin: 0; font-family: var(--serif); font-weight: 860; font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 1; font-size: clamp(1.9rem, 1rem + 4vw, 4.4rem); line-height: .98; letter-spacing: -.025em; }
+
+.p-quiet { grid-column: 5 / -1; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; gap: 2rem;
+  background: radial-gradient(circle, var(--tone) .8px, transparent 1px) 0 0 / 4px 4px, var(--bone); }
+.p-quiet p { margin: 0; background: var(--bone); padding: .5rem; font-size: .875rem; line-height: 1.6; }
+.drop { align-self: flex-end; width: 14px; height: 18px; background: var(--blood); border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; }
+
+@media (max-width: 700px) {
+  .p-read, .p-name, .p-statement, .p-quiet { grid-column: 1 / -1; }
+  .p-name { transform: none; }
+}
