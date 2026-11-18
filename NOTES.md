@@ -91,3 +91,10 @@ harmonium selftest --input numbers.wav --opus --output voice.wav --modem-output 
 uv run tools/harmonium_take.py voice.wav wire.wav --start 3.8 --length 17.5 --voice-offset 0.96 --note "..."
 ```
 (`--voice-offset` is the latency selftest prints. Pick `--start` / `--length` to cover one reading.)
+
+## Where we left off (2026-11-18)
+- Branch `experiment/music-station` holds everything; tag `radio-v1` is the earlier radio-only version.
+- Not yet live: GitHub `CatNotBat.github.io` main is still the old site. Going live means replacing that main (a force push or a fresh repo), which is Lev's call.
+- Not checked by ear: heterodyne, roomsense ticks, reveal beep. Not checked on real phones, Safari or Firefox.
+- Leftovers: `variants/` (ink prototype) is still in the repo but not deployed; delete it when you like.
+- To record your own numbers-station voice, see "harmonium numbers station" above.
