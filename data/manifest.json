@@ -1,1 +1,8 @@
-{ "static": null, "harmonium": null, "harmonium_audio": null }
+{
+ "static": null,
+ "harmonium": "harmonium.json",
+ "harmonium_audio": {
+  "voice": "harmonium-voice.m4a",
+  "wire": "harmonium-wire.m4a"
+ }
+}

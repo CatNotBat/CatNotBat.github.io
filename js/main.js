@@ -1132,7 +1132,7 @@ $('#play').addEventListener('click', () => sound.toggle());
       const pts = d.level.map((v, i) => `${((i * 240) / (n - 1)).toFixed(1)},${(54 - v * 44).toFixed(1)}`).join(' ');
       document.querySelector('.sig-carrier .noise')?.setAttribute('points', pts);
       const prov = document.querySelector('.sig-carrier .prov');
-      if (prov) prov.textContent = `Recorded, ${d.seconds} s.`;
+      if (prov) prov.textContent = d.note || `Recorded, ${d.seconds} s.`;
     } catch { /* keep the illustration */ }
   }
   if (m.harmonium_audio?.wire && m.harmonium_audio?.voice) harmoniumAudio(m.harmonium_audio);

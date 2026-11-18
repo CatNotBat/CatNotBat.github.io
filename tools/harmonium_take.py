@@ -4,11 +4,15 @@
 # ///
 """Turn one harmonium take into everything the site needs.
 
-Record two tracks of the same moment (16-bit WAV, same sample rate):
+Two tracks of the same moment (16-bit or float WAV, same sample rate):
   voice.wav  what comes out of harmonium at the far end
   wire.wav   what Discord actually carried
 
     uv run tools/harmonium_take.py voice.wav wire.wav --start 2.5 --length 14
+
+The easy way to get them, no call needed (48 kHz mono input):
+
+    harmonium selftest --input numbers.wav --opus --output voice.wav --modem-output wire.wav
 
 writes data/harmonium-voice.m4a, data/harmonium-wire.m4a and
 data/harmonium.json, and points data/manifest.json at them.
@@ -34,15 +38,38 @@ DATA = SITE / "data"
 
 
 def read(path: Path) -> tuple[np.ndarray, int]:
-    with wave.open(str(path), "rb") as w:
-        if w.getsampwidth() != 2:
-            sys.exit(f"{path.name}: 16-bit PCM WAV only")
-        rate, ch = w.getframerate(), w.getnchannels()
-        x = (
-            np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float32)
-            / 32768
-        )
-    return x.reshape(-1, ch).mean(axis=1), rate
+    """16-bit PCM or 32-bit float WAV (harmonium writes float), any channel count."""
+    raw = path.read_bytes()
+    if raw[:4] != b"RIFF" or raw[8:12] != b"WAVE":
+        sys.exit(f"{path.name}: not a WAV file")
+    fmt: tuple[int, int, int, int] | None = None
+    i = 12
+    while i + 8 <= len(raw):
+        cid, size = raw[i : i + 4], int.from_bytes(raw[i + 4 : i + 8], "little")
+        body = raw[i + 8 : i + 8 + size]
+        if cid == b"fmt ":
+            tag = int.from_bytes(body[0:2], "little")
+            if (
+                tag == 0xFFFE
+            ):  # WAVE_FORMAT_EXTENSIBLE: real tag is in the sub-format GUID
+                tag = int.from_bytes(body[24:26], "little")
+            fmt = (
+                tag,
+                int.from_bytes(body[2:4], "little"),
+                int.from_bytes(body[4:8], "little"),
+                int.from_bytes(body[14:16], "little"),
+            )
+        elif cid == b"data" and fmt:
+            tag, ch, rate, bits = fmt
+            if tag == 1 and bits == 16:
+                x = np.frombuffer(body, dtype="<i2").astype(np.float32) / 32768
+            elif tag == 3 and bits == 32:
+                x = np.frombuffer(body, dtype="<f4").astype(np.float32)
+            else:
+                sys.exit(f"{path.name}: 16-bit PCM or 32-bit float WAV only")
+            return x[: x.size - x.size % ch].reshape(-1, ch).mean(axis=1), rate
+        i += 8 + size + (size & 1)
+    sys.exit(f"{path.name}: no audio data found")
 
 
 def shape(x: np.ndarray, rate: int, start: float, length: float) -> np.ndarray:
@@ -128,13 +155,20 @@ def main() -> None:
     ap.add_argument("wire", type=Path)
     ap.add_argument("--start", type=float, default=0.0, help="seconds into both takes")
     ap.add_argument("--length", type=float, default=14.0)
+    ap.add_argument("--note", default="", help="caption shown under the spectrum")
+    ap.add_argument(
+        "--voice-offset",
+        type=float,
+        default=0.0,
+        help="seconds the decoded voice lags the wire (selftest prints it as latency)",
+    )
     args = ap.parse_args()
 
     voice, vr = read(args.voice)
     wire, wr = read(args.wire)
     if vr != wr:
         sys.exit(f"sample rates differ ({vr} vs {wr}); record both at the same rate")
-    v = shape(voice, vr, args.start, args.length)
+    v = shape(voice, vr, args.start + args.voice_offset, args.length)
     w = shape(wire, wr, args.start, args.length)
 
     DATA.mkdir(exist_ok=True)
@@ -146,7 +180,10 @@ def main() -> None:
             "voice": encode(tv, "harmonium-voice"),
             "wire": encode(tw, "harmonium-wire"),
         }
-    (DATA / "harmonium.json").write_text(json.dumps(spectrum(w, wr)))
+    spec = spectrum(w, wr)
+    if args.note:
+        spec["note"] = args.note
+    (DATA / "harmonium.json").write_text(json.dumps(spec))
 
     manifest_path = DATA / "manifest.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}

@@ -80,3 +80,14 @@ I chose not to embed Strudel itself: it's AGPL-3.0 (the whole site would have to
 - **harmonium spectrum**: `uv run tools/wav_spectrum.py wire.wav > data/harmonium.json`, then set `"harmonium": "harmonium.json"`.
 - **harmonium before/after audio**: two recordings of the same moment, e.g. `wire.m4a` (what Discord carries) and `voice.m4a` (what comes out the other side). Set `"harmonium_audio": { "wire": "wire.m4a", "voice": "voice.m4a" }`. A play button appears, and the modem toggle crossfades between the two.
   Use m4a or mp3 so Safari plays it.
+
+## harmonium numbers station (done, no call needed)
+The audio on the site is the real harmonium pipeline: Codec 2, WireGuard, the OFDM modem, then a simulated 64 kbps Opus channel, run offline with `harmonium selftest`. The voice reading the `and.birds.fly` bytes is macOS `say -v Samantha` (numbers stations often used synthetic voices).
+The run had 0% voice loss and 0 failed modem frames. The caption says it's offline.
+To swap in your own voice: record `tools/numbers.txt` as a voice memo, then
+```
+afconvert -f WAVE -d LEI16@48000 -c 1 memo.m4a numbers.wav
+harmonium selftest --input numbers.wav --opus --output voice.wav --modem-output wire.wav
+uv run tools/harmonium_take.py voice.wav wire.wav --start 3.8 --length 23 --voice-offset 0.96 --note "..."
+```
+(`--voice-offset` is the latency selftest prints. Pick `--start` / `--length` to cover one reading.)

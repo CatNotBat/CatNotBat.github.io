@@ -58,15 +58,15 @@
       <input type="range" id="dial" min="0" max="1000" step="1" value="500" aria-label="Tune the receiver">
     </div>
     <nav class="presets" aria-label="Stations">
-      <a href="#hum" data-preset="hum"><span>50 Hz</span> the hum</a>
-      <a href="#dns" data-preset="dns"><span>53</span> dns resolver</a>
-      <a href="#a440" data-preset="a440"><span>440 Hz</span> a</a>
-      <a href="#harmonium" data-preset="harmonium"><span>voice</span> harmonium</a>
-      <a href="#rv32" data-preset="rv32"><span>160 MHz</span> rv32</a>
-      <a href="#home" data-preset="home"><span>2.402 GHz</span> home</a>
-      <a href="#roomsense" data-preset="roomsense"><span>24 GHz</span> roomsense</a>
-      <a href="#mugs" data-preset="mugs"><span>480 THz</span> mugs</a>
-      <a href="#gamma" data-preset="gamma"><span>10&#185;&#8313; Hz</span> ?</a>
+      <a href="#hum" data-preset="hum">50 Hz</a>
+      <a href="#dns" data-preset="dns">53</a>
+      <a href="#a440" data-preset="a440">440 Hz</a>
+      <a href="#harmonium" data-preset="harmonium">0.3–3.7 kHz</a>
+      <a href="#rv32" data-preset="rv32">160 MHz</a>
+      <a href="#home" data-preset="home">2.402 GHz</a>
+      <a href="#roomsense" data-preset="roomsense">24 GHz</a>
+      <a href="#mugs" data-preset="mugs">480 THz</a>
+      <a href="#gamma" data-preset="gamma">10&#185;&#8313; Hz</a>
     </nav>
   </div>
 
@@ -126,9 +126,9 @@
       <button type="button" class="quiet-btn" id="play" aria-pressed="false">play</button>
     </section>
 
-    <section class="station ch" id="harmonium" data-f="1000" data-k="band" data-v="voice" data-name="harmonium" aria-labelledby="harm-h">
+    <section class="station ch" id="harmonium" data-f="1000" data-k="band" data-v="0.3–3.7 kHz" data-name="harmonium" aria-labelledby="harm-h">
       <div class="ch-text">
-        <p class="st-id"><span>voice band</span> modulated carrier</p>
+        <p class="st-id"><span>0.3–3.7 kHz</span> modulated carrier</p>
         <h2 id="harm-h" data-decode><a href="https://github.com/CatNotBat/harmonium" rel="noopener noreferrer">harmonium</a></h2>
         <p>A secret voice call hidden inside a normal Discord call. Your voice gets squeezed through Codec&nbsp;2, encrypted with WireGuard, then turned into noise by an OFDM modem I wrote. Discord carries the noise and has no idea. The trick is that WireGuard doesn't care what carries its packets, even a voice chat.</p>
         <ul class="stack"><li>Rust</li><li>DSP</li><li>WireGuard</li><li>Codec 2</li><li>OFDM</li></ul>
