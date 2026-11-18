@@ -159,6 +159,7 @@ const sound = (() => {
   let ctx = null, master, noiseG, voiceG, noiseBuf;
   let on = false, cur = null, pending = 'home', timers = [], oscs = [];
   const geiger = { alive: false, rate: 3 };
+  let flatOsc = null, flatG = null, dawnNodes = null;
 
   function init() {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -284,6 +285,62 @@ const sound = (() => {
     station, levels, geiger, toggle: () => btn.click(),
     get on() { return on; },
     twang() { if (on) blip(90 + Math.random() * 90, 0.7, 0.14, 'triangle'); },
+    // one BLE advertisement, heard by each node from where it sits: panned, and as loud as it heard it
+    adv(heard) {
+      if (!on || cur !== 'roomsense') return;
+      const t = ctx.currentTime;
+      const f = [1201, 1213, 1240][(Math.random() * 3) | 0]; // ch 37/38/39, halved into earshot
+      for (const { pan, db } of heard) {
+        const g = clamp(10 ** ((db + 40) / 20), 0, 1) * 0.5;
+        if (g < 0.004) continue;
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const gn = ctx.createGain();
+        gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g, t + 0.003); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+        o.connect(gn);
+        if (ctx.createStereoPanner) { const pn = ctx.createStereoPanner(); pn.pan.value = clamp(pan, -1, 1); gn.connect(pn); pn.connect(voiceG); }
+        else gn.connect(voiceG);
+        o.start(t); o.stop(t + 0.05);
+      }
+    },
+    // Better days: the monitor
+    flat(onOff) {
+      if (!on) return;
+      if (onOff && !flatOsc) {
+        flatOsc = ctx.createOscillator(); flatOsc.frequency.value = 880;
+        flatG = ctx.createGain(); flatG.gain.setValueAtTime(0, ctx.currentTime); flatG.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.02);
+        flatOsc.connect(flatG); flatG.connect(master); flatOsc.start();
+      } else if (!onOff && flatOsc) {
+        const o = flatOsc; flatG.gain.setValueAtTime(flatG.gain.value, ctx.currentTime); flatG.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.01);
+        setTimeout(() => o.stop(), 40); flatOsc = null;
+      }
+    },
+    beep() {
+      if (!on) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(); o.frequency.value = 880;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.09, t + 0.005); g.gain.setValueAtTime(0.09, t + 0.13); g.gain.linearRampToValueAtTime(0, t + 0.15);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.2);
+    },
+    dawn(onOff) {
+      if (!on) return;
+      const t = ctx.currentTime;
+      if (onOff && !dawnNodes) {
+        dawnNodes = [110, 164.81, 220, 329.63].map((f, i) => {
+          const o = ctx.createOscillator(); o.type = i ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 6;
+          const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(i ? 0.018 : 0.03, t + 4);
+          o.connect(g); g.connect(master); o.start(t);
+          return { o, g };
+        });
+      } else if (!onOff && dawnNodes) {
+        dawnNodes.forEach(({ o, g }) => { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 2.5); o.stop(t + 2.6); });
+        dawnNodes = null;
+      }
+    },
+    chime(up) {
+      if (!on || cur !== 'roomsense') return;
+      blip(up ? 440 : 659.25, 0.5, 0.06, 'sine');
+      setTimeout(() => blip(up ? 659.25 : 440, 0.7, 0.06, 'sine'), 160);
+    },
     thump() { if (on) { blip(62, 0.28, 0.5, 'sine'); setTimeout(() => blip(55, 0.22, 0.35, 'sine'), 190); } },
   };
 })();
@@ -576,6 +633,9 @@ const tuner = (() => {
     }
   }
 
+  // presets sit under their own ticks (CSS positions them only on wide screens)
+  $$('[data-preset]').forEach((a) => { const st = byId.get(a.dataset.preset); if (st) a.style.left = `${st.pos / 10}%`; });
+
   const found = new Set((() => { try { return JSON.parse(store.get('lk.found') || '[]'); } catch { return []; } })().filter((id) => byId.has(id)));
   const logEl = $('#logbook');
   const presets = $$('[data-preset]');
@@ -765,55 +825,130 @@ $('[data-carrier-toggle]')?.addEventListener('click', (e) => {
   });
 })();
 
-// roomsense: when you're in the room, each corner node ranges you; the circles cross at the estimate
+// roomsense, as it actually works: four corner nodes, each a BLE ear and an LD2450 radar.
+// The radars only see inside the room; the ears hear your phone through the wall too.
+// Presence is a probability that builds and decays (5 s in, 25 s out in the real thing,
+// quicker here), and the answer is a census by device type, never an identity.
 (() => {
   const fig = $('.sig-room');
   if (!fig) return;
   const svg = fig.querySelector('svg');
-  const rings = [...fig.querySelectorAll('.sense > circle')];
-  const est = fig.querySelector('.est');
-  const occ = fig.querySelector('.occ');
   const NODES = [[24, 18], [176, 18], [24, 142], [176, 142]];
   const ROOM = { x0: 20, y0: 14, x1: 180, y1: 146 };
-  let target = null;
-  let e = [100, 80];
-  let raf = 0;
-  let jitter = [0, 0];
+  const PX_PER_M = 40;
+  const fov = [...fig.querySelectorAll('.fov path')];
+  const lines = [...fig.querySelectorAll('.radar line')];
+  const blips = [...fig.querySelectorAll('.radar rect')];
+  const est = fig.querySelector('.est');
+  const mac = fig.querySelector('.mac');
+  const dbm = [...fig.querySelectorAll('.dbm text')];
+  const c1 = fig.querySelector('.c1');
+  const c2 = fig.querySelector('.c2');
+  const CARRY = [['phone'], ['phone', 'earbuds'], ['phone', 'earbuds', 'watch'], ['laptop']];
+  let carry = 0;
+  let you = null;        // where the pointer is, in room units, or null when gone
+  let p = 0.02;          // presence probability
+  let occupied = false;
+  let raf = 0, last = 0, nextAdv = 0, nextRot = 0, nextRadar = 0;
+  const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 1.15;
+  const inside = (x, y) => x > ROOM.x0 && x < ROOM.x1 && y > ROOM.y0 && y < ROOM.y1;
+  const sees = (i, x, y) => {
+    const [nx, ny] = NODES[i];
+    const face = Math.atan2(80 - ny, 100 - nx);
+    let d = Math.atan2(y - ny, x - nx) - face;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    return inside(x, y) && Math.abs(d) < Math.PI / 3 && Math.hypot(x - nx, y - ny) < 240;
+  };
+  const rssiAt = (i, x, y) => {
+    const m = Math.max(0.3, Math.hypot(x - NODES[i][0], y - NODES[i][1]) / PX_PER_M);
+    return -47 - 22 * Math.log10(m) - (inside(x, y) ? 0 : 7) + gauss() * 2;
+  };
+  const rotate = () => { mac.textContent = Array.from({ length: 3 }, () => ((Math.random() * 256) | 0).toString(16).padStart(2, '0')).join(':') + ':..'; };
 
-  function frame() {
+  function frame(t) {
     raf = 0;
-    if (!target) return;
-    const still = reduceMotion.matches;
-    // the estimate follows you, a little late and never quite sure (RSSI is noisy)
-    jitter = still ? [0, 0] : [jitter[0] * 0.85 + (Math.random() - 0.5) * 1.6, jitter[1] * 0.85 + (Math.random() - 0.5) * 1.6];
-    const k = still ? 1 : 0.14;
-    e = [e[0] + (target[0] - e[0]) * k, e[1] + (target[1] - e[1]) * k];
-    const ex = e[0] + jitter[0], ey = e[1] + jitter[1];
-    est.setAttribute('transform', `translate(${ex.toFixed(1)} ${ey.toFixed(1)})`);
-    rings.forEach((c, i) => {
-      const [nx, ny] = NODES[i];
-      const noise = still ? 0 : (Math.random() - 0.5) * 2.2;
-      c.setAttribute('r', (Math.hypot(ex - nx, ey - ny) + noise).toFixed(1));
-    });
-    raf = requestAnimationFrame(frame);
+    const dt = Math.min(0.1, (t - (last || t)) / 1000);
+    last = t;
+    const here = you && inside(you[0], you[1]);
+
+    // radar: each node that can see you reports its own slightly wrong position, at 10 Hz
+    if (t > nextRadar) {
+      nextRadar = t + 100;
+      let fx = 0, fy = 0, n = 0;
+      NODES.forEach(([nx, ny], i) => {
+        const on = !!you && sees(i, you[0], you[1]);
+        fov[i].classList.toggle('sees', on);
+        lines[i].classList.toggle('on', on);
+        blips[i].classList.toggle('on', on);
+        if (!on) return;
+        const bx = you[0] + gauss() * 2.5, by = you[1] + gauss() * 2.5;
+        lines[i].setAttribute('x2', bx.toFixed(1)); lines[i].setAttribute('y2', by.toFixed(1));
+        blips[i].setAttribute('transform', `translate(${bx.toFixed(1)} ${by.toFixed(1)})`);
+        fx += bx; fy += by; n++;
+      });
+      est.classList.toggle('on', n > 0);
+      if (n) est.setAttribute('transform', `translate(${(fx / n).toFixed(1)} ${(fy / n).toFixed(1)})`);
+      // the ears: everyone hears the phone, louder when close, quieter through the wall
+      dbm.forEach((el, i) => {
+        if (!you) { el.textContent = ''; return; }
+        const r = rssiAt(i, you[0], you[1]);
+        el.textContent = `${Math.round(r)} dBm`;
+        el.classList.toggle('loud', r > -62);
+      });
+    }
+
+    // the fused classifier: certain inside, unsure near a wall from outside, sure of nothing far away
+    const nearWall = you && !here && dbm.some((el) => Number.parseInt(el.textContent, 10) > -62);
+    const goal = here ? 0.96 : nearWall ? 0.14 : 0.02;
+    const tau = goal > p ? 1.2 : 4;
+    p += (goal - p) * (1 - Math.exp(-dt / tau));
+    const nowOcc = p >= 0.5;
+    if (nowOcc !== occupied) {
+      occupied = nowOcc;
+      sound.chime(occupied);
+      announce.textContent = occupied ? `roomsense: occupied, ${CARRY[carry].join(', ')}.` : 'roomsense: empty.';
+    }
+    c1.textContent = `${occupied ? 'occupied' : 'empty'} ${p.toFixed(2)}`;
+    c1.classList.toggle('occupied', occupied);
+    c2.textContent = occupied ? CARRY[carry].join('  ') : '';
+
+    // the phone advertises; it changes its address every so often and the census doesn't care
+    if (you && t > nextRot) { rotate(); nextRot = t + 6000 + Math.random() * 3000; }
+    if (you && t > nextAdv) {
+      nextAdv = t + 180 + Math.random() * 220;
+      sound.adv(NODES.map(([nx], i) => ({ pan: (nx - 100) / 90, db: rssiAt(i, you[0], you[1]) })));
+    }
+
+    fig.classList.toggle('sensing', !!you);
+    if (you || p > 0.025) raf = requestAnimationFrame(frame);
+    else last = 0;
   }
+  const wake = () => { if (!raf) raf = requestAnimationFrame(frame); };
   function at(ev) {
     const m = svg.getScreenCTM();
     if (!m) return null;
-    const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse());
-    return p.x > ROOM.x0 && p.x < ROOM.x1 && p.y > ROOM.y0 && p.y < ROOM.y1 ? [p.x, p.y] : null;
+    const q = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse());
+    return [q.x, q.y];
   }
-  function move(ev) {
-    const p = at(ev);
-    if (p && !target) { e = p.slice(); occ.textContent = '1'; }
-    target = p;
-    fig.classList.toggle('sensing', !!p);
-    if (!p) occ.textContent = '';
-    if (p && !raf) raf = requestAnimationFrame(frame);
-  }
-  svg.addEventListener('pointermove', move);
-  svg.addEventListener('pointerdown', move);
-  svg.addEventListener('pointerleave', () => { target = null; fig.classList.remove('sensing'); occ.textContent = ''; });
+  svg.addEventListener('pointermove', (ev) => { you = at(ev); wake(); });
+  // a tap inside the room (once you're already in it) changes what you're carrying
+  svg.addEventListener('pointerdown', (ev) => {
+    const q = at(ev);
+    if (q && you && inside(you[0], you[1]) && inside(q[0], q[1])) carry = (carry + 1) % CARRY.length;
+    you = q; wake();
+  });
+  svg.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') you = null; });
+  svg.addEventListener('keydown', (e) => {
+    const step = { ArrowLeft: [-8, 0], ArrowRight: [8, 0], ArrowUp: [0, -8], ArrowDown: [0, 8] }[e.key];
+    if (step) {
+      e.preventDefault(); e.stopPropagation();
+      you = you ?? [100, 170];
+      you = [clamp(you[0] + step[0], -20, 220), clamp(you[1] + step[1], -20, 180)];
+      wake();
+    } else if (e.key === 'Enter') { carry = (carry + 1) % CARRY.length; wake(); }
+    else if (e.key === 'Escape') { you = null; wake(); }
+  });
+  rotate();
 })();
 
 const lastBeatEl = $('#last-beat');
@@ -1083,14 +1218,16 @@ function openReveal(trigger) {
   story.scrollTop = 0;
   store.set('lk.lastBeat', String(Date.now()));
 
-  if (reduceMotion.matches) { stage('s-dawn', 'flying'); stage('s-story'); story.focus({ preventScroll: true }); return; }
+  if (reduceMotion.matches) { stage('s-dawn', 'flying'); stage('s-story'); sound.dawn(true); story.focus({ preventScroll: true }); return; }
 
   const t0 = performance.now();
   const hum = (t) => { drawEcg('hum', t - t0); ecgRaf = requestAnimationFrame(hum); };
   ecgRaf = requestAnimationFrame(hum);
-  at(700, () => { cancelAnimationFrame(ecgRaf); drawEcg('flat', 0); bdState.textContent = 'flatline'; });
+  at(700, () => { cancelAnimationFrame(ecgRaf); drawEcg('flat', 0); bdState.textContent = 'flatline'; sound.flat(true); });
   at(1800, () => {
     bdState.textContent = 'one beat';
+    sound.flat(false);
+    at(550, () => sound.beep());
     const s0 = performance.now();
     const sweep = (t) => {
       const k = Math.min(1, (t - s0) / 1100);
@@ -1099,7 +1236,7 @@ function openReveal(trigger) {
     };
     ecgRaf = requestAnimationFrame(sweep);
   });
-  at(3500, () => stage('s-dawn', 'flying'));
+  at(3500, () => { stage('s-dawn', 'flying'); sound.dawn(true); });
   at(5200, () => {
     stage('s-story');
     if (document.activeElement === dialog || document.activeElement?.id === 'bd-close') story.focus({ preventScroll: true });
@@ -1110,6 +1247,8 @@ dialog.addEventListener('close', () => {
   timers.forEach(clearTimeout);
   timers = [];
   cancelAnimationFrame(ecgRaf);
+  sound.flat(false);
+  sound.dawn(false);
   dialog.className = '';
   reserve = 0; // the heart used what it gathered
   charged = false;

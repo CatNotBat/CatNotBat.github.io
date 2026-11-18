@@ -410,15 +410,32 @@ dialog#better-days::backdrop { background: #000; }
 .mcu-ctl { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
 .mcu-ctl .quiet-btn { margin-top: 0; }
 
-/* roomsense: four ranges that cross where you are */
-.sig-room svg { touch-action: pan-y; cursor: crosshair; }
+/* roomsense: four radars, four ears, one census */
+.sig-room svg { touch-action: pan-y; cursor: crosshair; overflow: visible; }
+.sig-room svg:focus { outline: none; }
+.sig-room svg:focus-visible .wall { stroke: var(--trace); }
+.sig-room .fov path { fill: rgba(88, 168, 159, .018); stroke: rgba(88, 168, 159, .1); stroke-width: .5; transition: fill .5s; }
+.sig-room.sensing .fov path.sees { fill: rgba(88, 168, 159, .045); }
+
+/* one row of frequencies, sitting under their own ticks */
+.scale b span { display: none; }
+@media (min-width: 900px) {
+  .js .presets { position: relative; display: block; height: 2.25rem; margin: -.85rem 0 0; }
+  .js .presets a { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+}
 .sig-room .rings { transition: opacity .6s ease-out; }
-.sig-room.sensing .rings { opacity: .15; }
-.sig-room .sense circle { fill: none; stroke: var(--trace); stroke-width: .7; stroke-dasharray: 1.5 2.5; opacity: 0; transition: opacity .5s ease-out; }
-.sig-room.sensing .sense circle { opacity: .75; }
-.sig-room .sense .est circle { stroke-dasharray: none; fill: rgba(88, 168, 159, .14); stroke-width: .6; }
-.sig-room .sense .est .core { fill: var(--trace); stroke: none; }
-.sig-room .occ { font: 500 9px var(--mono); fill: var(--trace); opacity: 0; transition: opacity .5s ease-out; }
-.sig-room.sensing .occ { opacity: 1; }
+.sig-room.sensing .rings { opacity: .12; }
+.sig-room .radar line { stroke: var(--trace); stroke-width: .5; opacity: 0; transition: opacity .3s; }
+.sig-room .radar rect { fill: var(--trace); opacity: 0; transition: opacity .3s; }
+.sig-room .radar .on { opacity: .55; }
+.sig-room .est { opacity: 0; transition: opacity .4s; }
+.sig-room .est.on { opacity: 1; }
+.sig-room .est circle { fill: rgba(88, 168, 159, .14); stroke: var(--trace); stroke-width: .6; }
+.sig-room .est .core { fill: var(--trace); stroke: none; }
+.sig-room .mac { font: 400 5px var(--mono); fill: var(--ink-mute); }
+.sig-room .dbm text { font: 400 6.5px var(--mono); fill: var(--ink-mute); font-variant-numeric: tabular-nums; }
+.sig-room .dbm text.loud { fill: var(--trace); }
+.sig-room .census { font: 400 6.5px var(--mono); fill: var(--ink-mute); }
+.sig-room .census.c1.occupied { fill: var(--trace); }
 .sig-room .nodes rect { transition: fill .3s; }
-.sig-room.sensing .nodes rect { fill: rgba(88, 168, 159, .25); }
+.sig-room.sensing .nodes rect { fill: rgba(88, 168, 159, .2); }

@@ -76,7 +76,7 @@
     <section class="station st-home" id="home" data-f="2.402e9" data-k="freq" data-v="2.402 GHz" data-name="home" aria-labelledby="statement">
       <h1 id="statement" data-decode>This is a radio.</h1>
       <p class="sub">Everything I've made is on here somewhere. Turn the dial.</p>
-      <p class="hint">Some stations aren't on the list.</p>
+      <p class="hint">Some stations aren't on the list. Headphones help.</p>
     </section>
 
     <section class="station st-text" id="hum" data-f="50" data-k="freq" data-v="50 Hz" data-name="the hum" aria-labelledby="hum-h">
@@ -95,23 +95,24 @@
         <ul class="stack"><li>Python</li><li>ESP32</li><li>mmWave radar</li><li>BLE</li><li>Random Forest</li><li>MQTT</li></ul>
       </div>
       <figure class="sig sig-room">
-          <svg viewBox="0 0 200 160" role="img" aria-labelledby="room-cap">
+          <svg viewBox="-26 -24 252 208" tabindex="0" role="application" aria-roledescription="room" aria-label="The room. Move the pointer, or use the arrow keys, to walk in. Enter changes what you carry." aria-describedby="room-cap">
             <defs><clipPath id="room-clip"><rect x="20" y="14" width="160" height="132" /></clipPath></defs>
-            <rect x="20" y="14" width="160" height="132" class="wall" />
+            <g class="fov" clip-path="url(#room-clip)"><path d="M24 18 L239.0 -63.6 A230 230 0 0 1 -12.8 245.0 Z" /><path d="M176 18 L212.8 245.0 A230 230 0 0 1 -39.0 -63.6 Z" /><path d="M24 142 L-12.8 -85.0 A230 230 0 0 1 239.0 223.6 Z" /><path d="M176 142 L-39.0 223.6 A230 230 0 0 1 212.8 -85.0 Z" /></g>
             <g class="rings" clip-path="url(#room-clip)">
               <circle cx="24" cy="18" r="40" /><circle cx="24" cy="18" r="80" />
               <circle cx="176" cy="18" r="52" /><circle cx="176" cy="18" r="96" />
               <circle cx="24" cy="142" r="60" /><circle cx="24" cy="142" r="110" />
               <circle cx="176" cy="142" r="46" /><circle cx="176" cy="142" r="88" />
             </g>
-            <g class="sense" clip-path="url(#room-clip)">
-              <circle cx="24" cy="18" r="0" /><circle cx="176" cy="18" r="0" /><circle cx="24" cy="142" r="0" /><circle cx="176" cy="142" r="0" />
-              <g class="est"><circle r="9" /><circle r="2.2" class="core" /></g>
-            </g>
-            <text class="occ" x="100" y="140" text-anchor="middle"></text>
+            <rect x="20" y="14" width="160" height="132" class="wall" />
+            <g class="radar" clip-path="url(#room-clip)"><line x1="24" y1="18" x2="24" y2="18" /><rect x="-1.6" y="-1.6" width="3.2" height="3.2" /><line x1="176" y1="18" x2="176" y2="18" /><rect x="-1.6" y="-1.6" width="3.2" height="3.2" /><line x1="24" y1="142" x2="24" y2="142" /><rect x="-1.6" y="-1.6" width="3.2" height="3.2" /><line x1="176" y1="142" x2="176" y2="142" /><rect x="-1.6" y="-1.6" width="3.2" height="3.2" /></g>
+            <g class="est"><circle r="9" /><circle r="2" class="core" /><text class="mac" y="-12" text-anchor="middle"></text></g>
+            <g class="dbm"><text x="-22" y="4" text-anchor="start"></text><text x="222" y="4" text-anchor="end"></text><text x="-22" y="166" text-anchor="start"></text><text x="222" y="166" text-anchor="end"></text></g>
+            <text class="census c1" x="100" y="31" text-anchor="middle">empty</text>
+            <text class="census c2" x="100" y="40" text-anchor="middle"></text>
             <g class="nodes"><rect x="18" y="12" width="12" height="12"/><rect x="170" y="12" width="12" height="12"/><rect x="18" y="136" width="12" height="12"/><rect x="170" y="136" width="12" height="12"/></g>
           </svg>
-          <figcaption id="room-cap">Schematic. Four nodes, one per corner, listening to the room instead of the phones in it.</figcaption>
+          <figcaption id="room-cap">Schematic. Four nodes. One can't tell whether you're inside. Four can.</figcaption>
         </figure>
     </section>
 
