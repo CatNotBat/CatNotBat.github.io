@@ -65,3 +65,18 @@ An editable textarea in a small TidalCycles/Strudel-style mini-notation, interpr
 `a b c` splits a cycle, `[a b]` squeezes into one slot, `<a b>` alternates per cycle, `a*4` repeats, `,` stacks, `~` is a rest, and each line is a layer.
 Atoms: Hz values (50, 1420.405), notes (a4, c#5), plus `click chirp blip hum`. Each note sends a packet along the wires.
 I chose not to embed Strudel itself: it's AGPL-3.0 (the whole site would have to be AGPL) and it fetches samples from the network (CSP).
+
+## 160 MHz: rv32 (emulator)
+`js/rv32.js` is a from-scratch RV32IM assembler and CPU. It runs `fw/beakless.S` (226 bytes): sleep, read h₂ through memory-mapped I/O, print it over serial, and when it hits 100, raise the heart GPIO (the page's red beat) and spend the hydrogen.
+- `irradiate` feeds hydrogen while you hold it.
+- `edit` lets anyone rewrite the assembly; `flash` re-assembles it, and errors name the line.
+- Memory map: `0x60000000` uart, `+4` heart, `+8` h₂ (read the reserve, write it back), `+0xc` sleep in ms.
+
+## Real recordings (nothing shows until they exist)
+`data/manifest.json` names the files; `null` means use the synthetic or illustrated version.
+- **Static between stations** (Pi + RTL-SDR):
+  `rtl_power -f 88M:108M:20k -g 40 -i 1 -e 5m sweep.csv`, then
+  `uv run tools/sdr_static.py sweep.csv --place "Tel Aviv" > data/static.json`, then set `"static": "static.json"`.
+- **harmonium spectrum**: `uv run tools/wav_spectrum.py wire.wav > data/harmonium.json`, then set `"harmonium": "harmonium.json"`.
+- **harmonium before/after audio**: two recordings of the same moment, e.g. `wire.m4a` (what Discord carries) and `voice.m4a` (what comes out the other side). Set `"harmonium_audio": { "wire": "wire.m4a", "voice": "voice.m4a" }`. A play button appears, and the modem toggle crossfades between the two.
+  Use m4a or mp3 so Safari plays it.

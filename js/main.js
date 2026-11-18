@@ -1,4 +1,5 @@
 import { Dither, quad } from './dither.js';
+import { assemble, CPU, ABI } from './rv32.js';
 
 const root = document.documentElement;
 root.classList.add('js');
@@ -232,6 +233,7 @@ const sound = (() => {
     station, levels, geiger, toggle: () => btn.click(),
     get on() { return on; },
     twang() { if (on) blip(90 + Math.random() * 90, 0.7, 0.14, 'triangle'); },
+    thump() { if (on) { blip(62, 0.28, 0.5, 'sine'); setTimeout(() => blip(55, 0.22, 0.35, 'sine'), 190); } },
   };
 })();
 
@@ -278,7 +280,7 @@ setInterval(() => {
       dwell.textContent = `${Math.round(40 + reserve * 9.6)} counts per minute`;
     } else reserve = Math.max(0, reserve - 0.3);
   }
-  reserveEl.textContent = String(Math.round(reserve));
+  if (reserveEl) reserveEl.textContent = String(Math.round(reserve));
 }, 250);
 
 /* ================================================================== *
@@ -294,7 +296,7 @@ const WIRES = [
 const wire = (() => {
   const host = $('.wires');
   const canvas = $('#wire');
-  const noop = { beat() {}, packet() {}, set staticLevel(v) {} };
+  const noop = { beat() {}, packet() {}, useStatic() {}, set staticLevel(v) {} };
   if (!canvas?.getContext) return noop;
   const d = new Dither(canvas, 3);
   let packets = [];
@@ -305,6 +307,7 @@ const wire = (() => {
   let last = 0;
   let nextPacket = 0;
   let staticLevel = 0;
+  let real = null;
   const side = WIRES.map(() => 0);
 
   function disp(wi, u, t) {
@@ -353,10 +356,23 @@ const wire = (() => {
       }
       if (staticLevel > 0.02) {
         o.shadowBlur = 0;
-        const n = staticLevel * w * h * 0.012;
-        for (let i = 0; i < n; i++) {
-          o.fillStyle = `rgba(255,0,0,${0.25 + Math.random() * 0.5})`;
-          o.fillRect((Math.random() * w) | 0, (Math.random() * h) | 0, 1, 1);
+        if (real) {
+          // a recorded sweep, one row at a time: the loud columns are real carriers
+          const row = real.rows[((t / 90) | 0) % real.rows.length];
+          const n = staticLevel * w * h * 0.03;
+          for (let i = 0; i < n; i++) {
+            const x = (Math.random() * w) | 0;
+            const v = row[((x * real.width) / w) | 0] / 255;
+            if (Math.random() > v * v * 1.6) continue;
+            o.fillStyle = `rgba(255,0,0,${0.3 + v * 0.7})`;
+            o.fillRect(x, (Math.random() * h) | 0, 1, 1);
+          }
+        } else {
+          const n = staticLevel * w * h * 0.012;
+          for (let i = 0; i < n; i++) {
+            o.fillStyle = `rgba(255,0,0,${0.25 + Math.random() * 0.5})`;
+            o.fillRect((Math.random() * w) | 0, (Math.random() * h) | 0, 1, 1);
+          }
         }
       }
       if (beatAt >= 0) {
@@ -435,6 +451,7 @@ const wire = (() => {
   start();
 
   return {
+    useStatic(d) { real = d; },
     packet() { if (packets.length < 40) packets.push({ u: 0, v: 0.00034 }); start(); },
     beat() { if (!reduceMotion.matches) beatAt = performance.now(); },
     set staticLevel(v) { staticLevel = v; if (reduceMotion.matches) paint(0); },
@@ -492,7 +509,7 @@ const tuner = (() => {
   // remember the original text of every node that can drown in static
   for (const s of stations) {
     const walker = document.createTreeWalker(s.el, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => (n.parentElement.closest('pre, svg, button, .dwell, textarea, .code') || !n.data.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+      acceptNode: (n) => (n.parentElement.closest('pre, svg, button, .dwell, textarea, .code, .mcu, .prov') || !n.data.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
     });
     s.nodes = [];
     while (walker.nextNode()) s.nodes.push({ n: walker.currentNode, t: walker.currentNode.data });
@@ -513,7 +530,7 @@ const tuner = (() => {
   const logEl = $('#logbook');
   const presets = $$('[data-preset]');
   function renderLog() {
-    logEl.textContent = `${found.size}/${N}`;
+    if (logEl) logEl.textContent = `${found.size}/${N}`;
     presets.forEach((a) => { if (found.has(a.dataset.preset)) a.dataset.found = ''; });
   }
   renderLog();
@@ -720,12 +737,120 @@ $('[data-carrier-toggle]')?.addEventListener('click', (e) => {
 const lastBeatEl = $('#last-beat');
 function renderLastBeat() {
   const t = Number(store.get('lk.lastBeat'));
-  if (!t) return;
+  if (!t || !lastBeatEl) return;
   const s = (Date.now() - t) / 1000;
   lastBeatEl.textContent = s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)}m ago` : s < 86400 ? `${Math.round(s / 3600)}h ago` : `${Math.round(s / 86400)}d ago`;
 }
 renderLastBeat();
 setInterval(renderLastBeat, 30000);
+
+/* ================================================================== *
+ * 160 MHz. An emulated RV32IM chip running the beakless's firmware.
+ *   0x60000000 uart   0x60000004 heart   0x60000008 h2   0x6000000c sleep
+ * ================================================================== */
+const mcu = (() => {
+  const fw = $('#fw');
+  if (!fw) return null;
+  const ed = $('#fw-edit');
+  const err = $('#fw-err');
+  const led = $('#led');
+  const stEl = $('#mcu-state');
+  const uart = $('#uart');
+  const editB = $('#mcu-edit');
+  let source = fw.textContent;
+  let prog = null, cpu = null, lines = [], curLine = -1;
+  let out = '', gpio = 0, sleepUntil = 0, acc = 0, last = 0;
+  const hex = (v) => (v >>> 0).toString(16).padStart(8, '0');
+
+  const io = {
+    read(off) { return off === 8 ? Math.round(reserve) : off === 4 ? gpio : 0; },
+    write(off, v) {
+      if (off === 0) { out = (out + String.fromCharCode(v & 0xff)).slice(-800); }
+      else if (off === 4) {
+        const on = v & 1;
+        if (on && !gpio) { wire.beat(); sound.thump(); jolt(); }
+        gpio = on;
+      } else if (off === 8) {
+        reserve = clamp(v | 0, 0, 100);
+        if (reserve < 100 && charged) { charged = false; delete signalBtn.dataset.charged; signalState.textContent = 'dormant'; }
+      } else if (off === 12) sleepUntil = performance.now() + clamp(v | 0, 0, 60000);
+    },
+  };
+
+  function flash() {
+    try { prog = assemble(source); } catch (e) { err.textContent = e.message; return false; }
+    err.textContent = `${prog.size} bytes`;
+    cpu = new CPU(prog.image, io);
+    out = ''; gpio = 0; sleepUntil = 0; acc = 0; curLine = -1;
+    fw.replaceChildren(...source.split('\n').map((t) => {
+      const sp = document.createElement('span'); sp.className = 'ln'; sp.textContent = `${t}\n`; return sp;
+    }));
+    lines = [...fw.children];
+    render();
+    return true;
+  }
+
+  function render() {
+    const ln = prog.lineAt.get(cpu.pc);
+    if (ln !== curLine) {
+      lines[curLine]?.classList.remove('pc');
+      const el = lines[ln];
+      if (el) {
+        el.classList.add('pc');
+        const top = el.offsetTop - fw.offsetTop;
+        if (top < fw.scrollTop || top > fw.scrollTop + fw.clientHeight - 24) fw.scrollTop = top - fw.clientHeight / 3;
+      }
+      curLine = ln;
+    }
+    cpu.touched.clear();
+    const u = out.split('\n').slice(-9).join('\n');
+    if (uart.textContent !== u) uart.textContent = u;
+    led.toggleAttribute('data-on', !!gpio);
+    const sleeping = performance.now() < sleepUntil;
+    stEl.textContent = cpu.halted ?? (sleeping ? 'asleep' : `pc ${hex(cpu.pc)}`);
+  }
+
+  const active = () => tuner.lockedId() === 'rv32' && state === 'listening' && !dialog.open && !document.hidden && !ed.matches(':not([hidden])');
+  function loop(t) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(100, t - last);
+    last = t;
+    if (!cpu || !active()) return;
+    if (!cpu.halted && t >= sleepUntil) {
+      acc += (dt / 1000) * 22;
+      let n = Math.floor(acc);
+      acc -= n;
+      while (n-- > 0 && !cpu.halted && performance.now() >= sleepUntil) cpu.step();
+    }
+    render();
+  }
+  requestAnimationFrame(loop);
+
+  const zap = $('#mcu-zap');
+  let zapT = 0;
+  const zapOn = () => { clearInterval(zapT); feed(5); zapT = setInterval(() => feed(5), 110); };
+  const zapOff = () => clearInterval(zapT);
+  zap.addEventListener('pointerdown', zapOn);
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => zap.addEventListener(ev, zapOff));
+  zap.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') feed(8); });
+  editB.addEventListener('click', () => {
+    if (ed.hidden) {
+      ed.value = source;
+      ed.hidden = false; fw.hidden = true;
+      editB.textContent = 'flash'; editB.setAttribute('aria-pressed', 'true');
+      ed.focus();
+    } else {
+      source = ed.value;
+      if (flash()) {
+        ed.hidden = true; fw.hidden = false;
+        editB.textContent = 'edit'; editB.setAttribute('aria-pressed', 'false');
+      }
+    }
+  });
+  ed.addEventListener('keydown', (e) => e.stopPropagation());
+  flash();
+  return { flash };
+})();
 
 /* ================================================================== *
  * Better days
@@ -869,3 +994,73 @@ addEventListener('hashchange', () => {
 });
 
 $('#play').addEventListener('click', () => sound.toggle());
+
+/* ================================================================== *
+ * Real recordings, when there are any. data/manifest.json says which
+ * exist, so nothing is fetched (or faked) when they don't.
+ * ================================================================== */
+(async () => {
+  let m;
+  try { m = await (await fetch('data/manifest.json')).json(); } catch { return; }
+  if (m.static) {
+    try {
+      const d = await (await fetch(`data/${m.static}`)).json();
+      const rows = d.rows.map((r) => Uint8Array.from(atob(r), (c) => c.charCodeAt(0)));
+      if (rows.length && d.width > 0) wire.useStatic({ width: d.width, rows });
+    } catch { /* keep the synthetic static */ }
+  }
+  if (m.harmonium) {
+    try {
+      const d = await (await fetch(`data/${m.harmonium}`)).json();
+      const n = d.level.length;
+      const pts = d.level.map((v, i) => `${((i * 240) / (n - 1)).toFixed(1)},${(54 - v * 44).toFixed(1)}`).join(' ');
+      document.querySelector('.sig-carrier .noise')?.setAttribute('points', pts);
+      const prov = document.querySelector('.sig-carrier .prov');
+      if (prov) prov.textContent = `Recorded, ${d.seconds} s.`;
+    } catch { /* keep the illustration */ }
+  }
+  if (m.harmonium_audio?.wire && m.harmonium_audio?.voice) harmoniumAudio(m.harmonium_audio);
+})();
+
+// Two takes of the same moment: what Discord carried, and what came out the
+// other end. Both loop together; the modem toggle crossfades between them.
+function harmoniumAudio({ wire: wireFile, voice: voiceFile }) {
+  const btn = $('#harm-play');
+  const fig = btn.closest('.sig-carrier');
+  let ctx = null, gains = null, srcs = [];
+  btn.hidden = false;
+  const mix = () => {
+    if (!gains) return;
+    const voice = fig.dataset.view === 'comb';
+    const t = ctx.currentTime;
+    gains[0].gain.setTargetAtTime(voice ? 0 : 0.9, t, 0.08);
+    gains[1].gain.setTargetAtTime(voice ? 0.9 : 0, t, 0.08);
+  };
+  const stop = () => {
+    srcs.forEach((x) => { try { x.stop(); } catch { /* done */ } });
+    srcs = [];
+    btn.textContent = 'play';
+    btn.setAttribute('aria-pressed', 'false');
+  };
+  new MutationObserver(mix).observe(fig, { attributes: true, attributeFilter: ['data-view'] });
+  setInterval(() => { if (srcs.length && tuner.lockedId() !== 'harmonium') stop(); }, 300);
+  btn.addEventListener('click', async () => {
+    if (srcs.length) { stop(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx ??= new AC();
+    await ctx.resume();
+    btn.textContent = '...';
+    try {
+      const bufs = await Promise.all([wireFile, voiceFile].map(async (f) => ctx.decodeAudioData(await (await fetch(`data/${f}`)).arrayBuffer())));
+      gains = bufs.map(() => { const g = ctx.createGain(); g.gain.value = 0; g.connect(ctx.destination); return g; });
+      const at = ctx.currentTime + 0.05;
+      srcs = bufs.map((b, i) => { const x = ctx.createBufferSource(); x.buffer = b; x.loop = true; x.connect(gains[i]); x.start(at); return x; });
+      mix();
+      btn.textContent = 'stop';
+      btn.setAttribute('aria-pressed', 'true');
+    } catch {
+      btn.textContent = 'could not load';
+    }
+  });
+}
