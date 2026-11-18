@@ -14,6 +14,97 @@ const store = {
 console.log('%cyou opened the console. hi.\nthere are more stations than the list admits.', 'color:#58a89f;font-family:monospace');
 
 /* ================================================================== *
+ * 440. A tiny pattern language, borrowed in spirit from TidalCycles /
+ * Strudel mini-notation and written from scratch: no library, no eval.
+ *   a b c   one cycle split in three      [a b]  squeeze into one slot
+ *   <a b>   one per cycle, in turn         a*4    repeat inside the slot
+ *   a, b    at the same time               ~      silence
+ * Atoms: a frequency in Hz, a note (a4, c#5, bb3), or click chirp blip hum.
+ * Every line is its own layer.
+ * ================================================================== */
+const NOTE = { c: -9, d: -7, e: -5, f: -4, g: -2, a: 0, b: 2 };
+const WORDS = new Set(['click', 'chirp', 'blip', 'hum']);
+function atom(tok) {
+  if (tok === '~' || tok === '-') return { t: 'rest' };
+  if (/^\d+(\.\d+)?$/.test(tok)) return { t: 'hz', v: clamp(Number(tok), 20, 8000) };
+  const m = /^([a-g])([#b]?)(\d)$/.exec(tok);
+  if (m) return { t: 'hz', v: 440 * 2 ** ((NOTE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (Number(m[3]) - 4) * 12) / 12) };
+  if (WORDS.has(tok)) return { t: 'sym', v: tok };
+  throw new Error(`no such thing as "${tok}"`);
+}
+function parseLine(src) {
+  let i = 0;
+  const ws = () => { while (i < src.length && /\s/.test(src[i])) i++; };
+  function group(end) {
+    const layers = [[]];
+    for (;;) {
+      ws();
+      if (i >= src.length) { if (end) throw new Error(`missing ${end}`); break; }
+      const c = src[i];
+      if (c === end) { i++; break; }
+      if (c === ']' || c === '>') throw new Error(`stray ${c}`);
+      if (c === ',') { i++; layers.push([]); continue; }
+      layers[layers.length - 1].push(term());
+    }
+    const seqs = layers.map((ch) => ({ t: 'seq', ch }));
+    return seqs.length === 1 ? seqs[0] : { t: 'stack', ch: seqs };
+  }
+  function term() {
+    let node;
+    if (src[i] === '[') { i++; node = group(']'); }
+    else if (src[i] === '<') { i++; const g = group('>'); node = { t: 'alt', ch: g.t === 'seq' ? g.ch : [g] }; }
+    else {
+      const m = /^[A-Za-z0-9.~#_-]+/.exec(src.slice(i));
+      if (!m) throw new Error(`stray ${src[i]}`);
+      i += m[0].length;
+      node = atom(m[0]);
+    }
+    while (src[i] === '*') {
+      i++;
+      const m = /^\d+/.exec(src.slice(i));
+      if (!m) throw new Error('a number goes after *');
+      i += m[0].length;
+      node = { t: 'fast', n: clamp(Number(m[0]), 1, 32), ch: [node] };
+    }
+    return node;
+  }
+  return group(null);
+}
+function query(node, cycle, b, d, out) {
+  switch (node.t) {
+    case 'hz': case 'sym': out.push({ b, d, v: node }); break;
+    case 'seq': node.ch.forEach((c, k) => query(c, cycle, b + (k * d) / node.ch.length, d / node.ch.length, out)); break;
+    case 'stack': node.ch.forEach((c) => query(c, cycle, b, d, out)); break;
+    case 'alt': if (node.ch.length) query(node.ch[((cycle % node.ch.length) + node.ch.length) % node.ch.length], Math.floor(cycle / node.ch.length), b, d, out); break;
+    case 'fast': for (let k = 0; k < node.n; k++) query(node.ch[0], cycle * node.n + k, b + (k * d) / node.n, d / node.n, out); break;
+    default: break;
+  }
+  return out;
+}
+const music = (() => {
+  const ta = $('#code');
+  const err = $('#code-err');
+  let layers = [];
+  function compile() {
+    const next = [];
+    const lines = ta.value.split('\n');
+    for (let n = 0; n < lines.length; n++) {
+      const line = lines[n].replace(/\/\/.*$/, '').trim();
+      if (!line) continue;
+      try { next.push(parseLine(line)); }
+      catch (e) { err.textContent = `line ${n + 1}: ${e.message}`; return; }
+    }
+    err.textContent = '';
+    layers = next;
+  }
+  let t = 0;
+  ta.addEventListener('input', () => { clearTimeout(t); t = setTimeout(compile, 180); });
+  ta.addEventListener('keydown', (e) => e.stopPropagation());
+  compile();
+  return { events(cycle) { const out = []; layers.forEach((l) => query(l, cycle, 0, 1, out)); return out; } };
+})();
+
+/* ================================================================== *
  * Sound. Off until asked. Everything is synthesised, nothing is fetched.
  * ================================================================== */
 const sound = (() => {
@@ -51,6 +142,23 @@ const sound = (() => {
     gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g, t + 0.005); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(gn); gn.connect(voiceG); o.start(t); o.stop(t + dur + 0.02);
   }
+  function play(v, at, dur) {
+    if (v.t === 'sym') {
+      if (v.v === 'click') { const s = ctx.createBufferSource(); s.buffer = noiseBuf; const g = ctx.createGain(); g.gain.setValueAtTime(0.6, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.012); s.connect(g); g.connect(voiceG); s.start(at, Math.random()); s.stop(at + 0.03); return; }
+      const f0 = { chirp: 400, blip: 2402, hum: 50 }[v.v];
+      const o = ctx.createOscillator(); o.type = v.v === 'hum' ? 'sawtooth' : 'sine';
+      o.frequency.setValueAtTime(f0, at);
+      if (v.v === 'chirp') o.frequency.linearRampToValueAtTime(1600, at + dur);
+      const g = ctx.createGain(); const peak = v.v === 'blip' ? 0.05 : 0.07; const len = v.v === 'blip' ? 0.03 : dur;
+      g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(peak, at + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+      o.connect(g); g.connect(voiceG); o.start(at); o.stop(at + len + 0.05);
+      return;
+    }
+    const o = ctx.createOscillator(); o.type = v.v < 120 ? 'sawtooth' : 'triangle'; o.frequency.value = v.v;
+    const g = ctx.createGain(); const peak = 0.09 * Math.min(1, 500 / v.v) + 0.02;
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(peak, at + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, at + Math.max(0.08, dur * 0.95));
+    o.connect(g); g.connect(voiceG); o.start(at); o.stop(at + dur + 0.05);
+  }
   function click() {
     const t = ctx.currentTime;
     const s = ctx.createBufferSource(); s.buffer = noiseBuf;
@@ -70,6 +178,24 @@ const sound = (() => {
       const o = osc('sine', 400, 0.045);
       const sweep = () => { const t = ctx.currentTime; o.frequency.setValueAtTime(400, t); o.frequency.linearRampToValueAtTime(1600, t + 1.2); };
       sweep(); timers.push(setInterval(sweep, 1500));
+    },
+    a440() {
+      const CYCLE = 2.4;
+      const t0 = ctx.currentTime + 0.08;
+      let next = 0;
+      const sched = () => {
+        while (t0 + next * CYCLE < ctx.currentTime + 0.3) {
+          for (const e of music.events(next)) {
+            const at = t0 + (next + e.b) * CYCLE;
+            const dur = Math.min(e.d * CYCLE, 1.6);
+            play(e.v, at, dur);
+            setTimeout(() => wire.packet(), Math.max(0, (at - ctx.currentTime) * 1000));
+          }
+          next++;
+        }
+      };
+      sched();
+      timers.push(setInterval(sched, 60));
     },
     gamma() {
       geiger.alive = true;
@@ -98,11 +224,13 @@ const sound = (() => {
     on = !on;
     btn.setAttribute('aria-pressed', String(on));
     btn.textContent = on ? 'sound on' : 'sound off';
+    const pb = $('#play'); pb.setAttribute('aria-pressed', String(on)); pb.textContent = on ? 'stop' : 'play';
     if (on) { ctx.resume(); master.gain.setTargetAtTime(0.5, ctx.currentTime, 0.1); cur = null; tuner.refresh(); }
     else { master.gain.setTargetAtTime(0, ctx.currentTime, 0.05); stopVoice(); cur = null; }
   });
   return {
-    station, levels, geiger,
+    station, levels, geiger, toggle: () => btn.click(),
+    get on() { return on; },
     twang() { if (on) blip(90 + Math.random() * 90, 0.7, 0.14, 'triangle'); },
   };
 })();
@@ -166,7 +294,7 @@ const WIRES = [
 const wire = (() => {
   const host = $('.wires');
   const canvas = $('#wire');
-  const noop = { beat() {}, set staticLevel(v) {} };
+  const noop = { beat() {}, packet() {}, set staticLevel(v) {} };
   if (!canvas?.getContext) return noop;
   const d = new Dither(canvas, 3);
   let packets = [];
@@ -307,6 +435,7 @@ const wire = (() => {
   start();
 
   return {
+    packet() { if (packets.length < 40) packets.push({ u: 0, v: 0.00034 }); start(); },
     beat() { if (!reduceMotion.matches) beatAt = performance.now(); },
     set staticLevel(v) { staticLevel = v; if (reduceMotion.matches) paint(0); },
   };
@@ -363,7 +492,7 @@ const tuner = (() => {
   // remember the original text of every node that can drown in static
   for (const s of stations) {
     const walker = document.createTreeWalker(s.el, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => (n.parentElement.closest('pre, svg, button, .dwell') || !n.data.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+      acceptNode: (n) => (n.parentElement.closest('pre, svg, button, .dwell, textarea, .code') || !n.data.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
     });
     s.nodes = [];
     while (walker.nextNode()) s.nodes.push({ n: walker.currentNode, t: walker.currentNode.data });
@@ -738,3 +867,5 @@ addEventListener('hashchange', () => {
   else if (h === 'transmit') setState('transmitting');
   else if (tuner.byId.has(h) && h !== tuner.lockedId()) tuner.tuneTo(h);
 });
+
+$('#play').addEventListener('click', () => sound.toggle());

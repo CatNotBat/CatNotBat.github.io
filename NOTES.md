@@ -7,11 +7,12 @@ The site is a radio. The `freq` readout is a real dial. Each station sits at the
 |---|---|---|
 | 50 Hz | the hum | Israeli mains. The wires at the top hum along with it, and you can pluck them |
 | 53 | dns resolver | the port number, sitting right next to the hum. Shows a real query for `and.birds.fly`, answered NXDOMAIN |
+| 440 Hz | a (pattern) | live-codeable music, see below |
 | voice band | harmonium | audio band, where the OFDM modem lives |
 | 1420.405 MHz | **hidden**: the hydrogen line | not in the presets. A hint toward gamma |
 | 2.402 GHz | home | BLE advertising channel 37 |
 | 24 GHz | roomsense | the radar |
-| 480 THz | mugs | red visible light, for the squid tentacles. Honest "no carrier" until there's a scan |
+| 480 THz | mugs | red light. Deliberately unexplained: just a snowy frame saying "no carrier" until there's a scan |
 | 3×10¹⁹ Hz | gamma | radiation fills the h₂ reserve, a Geiger counter counts up, then Better days |
 
 **State** is interactive:
@@ -58,3 +59,9 @@ In the in-app browser at 1440 and 390, with no horizontal scroll:
 - Real phones (touch-dragging the dial).
 - Reduced motion in a real browser.
 - Lighthouse.
+
+## 440 Hz: the pattern station (branch experiment/music-station)
+An editable textarea in a small TidalCycles/Strudel-style mini-notation, interpreted by ~120 lines of my own JS (no library, no eval, no network).
+`a b c` splits a cycle, `[a b]` squeezes into one slot, `<a b>` alternates per cycle, `a*4` repeats, `,` stacks, `~` is a rest, and each line is a layer.
+Atoms: Hz values (50, 1420.405), notes (a4, c#5), plus `click chirp blip hum`. Each note sends a packet along the wires.
+I chose not to embed Strudel itself: it's AGPL-3.0 (the whole site would have to be AGPL) and it fetches samples from the network (CSP).

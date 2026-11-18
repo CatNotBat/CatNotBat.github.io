@@ -65,6 +65,7 @@
     <nav class="presets" aria-label="Stations">
       <a href="#hum" data-preset="hum"><span>50 Hz</span> the hum</a>
       <a href="#dns" data-preset="dns"><span>53</span> dns resolver</a>
+      <a href="#a440" data-preset="a440"><span>440 Hz</span> a</a>
       <a href="#harmonium" data-preset="harmonium"><span>voice</span> harmonium</a>
       <a href="#home" data-preset="home"><span>2.402 GHz</span> home</a>
       <a href="#roomsense" data-preset="roomsense"><span>24 GHz</span> roomsense</a>
@@ -79,13 +80,13 @@
     <section class="station st-home" id="home" data-f="2.402e9" data-k="freq" data-v="2.402 GHz" data-name="home" aria-labelledby="statement">
       <h1 id="statement" data-decode>This is a radio.</h1>
       <p class="sub">Everything I've made is on here somewhere. Turn the dial.</p>
-      <p class="hint">Drag it, use the arrow keys, or tap a station. Some stations aren't on the list.</p>
+      <p class="hint">Some stations aren't on the list.</p>
     </section>
 
     <section class="station st-text" id="hum" data-f="50" data-k="freq" data-v="50 Hz" data-name="the hum" aria-labelledby="hum-h">
       <p class="st-id"><span>50 Hz</span> the hum</p>
       <h2 id="hum-h" data-decode>Hi, I'm Lev.</h2>
-      <p>I live in Tel Aviv, where the wall hums at 50&nbsp;Hz. The wires at the top of this page are humming along with it. You can pluck them.</p>
+      <p>I live in Tel Aviv, where the wall hums at 50&nbsp;Hz.</p>
       <p>I like taking things apart down to the bytes and the waveforms, mostly to find out whether a dumb idea works. A VPN running bare on a microcontroller. A voice call smuggled inside another voice call. Right now it's drones talking MAVLink, point clouds, and too many ESP32s.</p>
     </section>
 
@@ -111,6 +112,19 @@
           </svg>
           <figcaption id="room-cap">Schematic. Four nodes, one per corner, listening to the room instead of the phones in it.</figcaption>
         </figure>
+    </section>
+
+    <section class="station st-text st-music" id="a440" data-f="440" data-k="pitch" data-v="A4" data-name="a" aria-labelledby="a-h">
+      <p class="st-id"><span>440 Hz</span> a</p>
+      <h2 id="a-h" class="sr-only">An editable pattern that plays as music</h2>
+      <div class="code">
+        <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" rows="5" aria-label="Pattern" aria-describedby="code-err">50 ~ [50 50] ~
+&lt;a4 c5&gt; [~ e5] &lt;g4 [b4 d5]&gt; ~
+~ click*3 ~ &lt;click*2 chirp&gt;
+~ ~ ~ &lt;~ ~ ~ 1420.405&gt;</textarea>
+        <p class="code-err" id="code-err" aria-live="polite"></p>
+      </div>
+      <button type="button" class="quiet-btn" id="play" aria-pressed="false">play</button>
     </section>
 
     <section class="station ch" id="harmonium" data-f="1000" data-k="band" data-v="voice" data-name="harmonium" aria-labelledby="harm-h">
@@ -159,24 +173,23 @@
 
     <section class="station st-text st-hidden" id="hydrogen" data-f="1.420405e9" data-k="freq" data-v="1420.405 MHz" data-name="hydrogen line" data-secret aria-labelledby="h-h">
       <p class="st-id"><span>1420.405 MHz</span> the hydrogen line</p>
-      <h2 id="h-h" data-decode>You found the hydrogen line.</h2>
-      <p>Cold hydrogen all over the galaxy whispers at exactly this frequency, and radio telescopes spend their nights listening for it. Something else on this dial runs on hydrogen too.</p>
+      <h2 id="h-h" data-decode>Cold hydrogen, whispering.</h2>
+      <p>Something else on this dial runs on it.</p>
     </section>
 
-    <section class="station st-text" id="mugs" data-f="4.8e14" data-k="light" data-v="red, 480 THz" data-name="mugs" aria-labelledby="mugs-h">
-      <p class="st-id"><span>480 THz</span> visible, red</p>
-      <h2 id="mugs-h" data-decode>Not everything here has firmware.</h2>
-      <p>I paint mugs. A white one with red squid tentacles crawling up the side, and a green dinosaur. They live up here in visible light because they're the only things on the dial you look at with your eyes.</p>
+    <section class="station st-text" id="mugs" data-f="4.8e14" data-k="light" data-v="480 THz" data-name="mugs" aria-labelledby="mugs-h">
+      <p class="st-id"><span>480 THz</span></p>
+      <h2 id="mugs-h" class="sr-only">mugs</h2>
       <figure class="nocarrier">
         <div class="snow" aria-hidden="true"></div>
-        <figcaption>No carrier yet. A scan of the squid is coming.</figcaption>
+        <figcaption>no carrier</figcaption>
       </figure>
     </section>
 
     <section class="station st-text st-gamma" id="gamma" data-f="3e19" data-k="freq" data-v="3&#215;10&#185;&#8313; Hz" data-name="gamma" aria-labelledby="gamma-h">
       <p class="st-id"><span>3&#215;10&#185;&#8313; Hz</span> gamma</p>
       <h2 id="gamma-h" data-decode>It's warm up here.</h2>
-      <p>Too much radiation for anything to live. Almost. Hold still.</p>
+      <p>Hold still.</p>
       <p class="dwell" id="dwell" aria-hidden="true"></p>
       <button type="button" class="quiet-btn" data-reveal>wake it</button>
     </section>
