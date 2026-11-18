@@ -2,3 +2,5 @@
 .env*
 *.pcap
 *.pcapng
+NOTES.md
+CLAUDE.md
