@@ -1,7 +1,7 @@
 name: deploy
+# Pages currently serves main directly ("deploy from a branch"), so this only runs by hand.
+# To use it: Settings > Pages > Source: GitHub Actions, then add `push: branches: [main]` back.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
