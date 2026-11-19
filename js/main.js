@@ -1724,7 +1724,7 @@ const memory = (() => {
       ['stations found', names.length ? names.join(', ') : 'none yet'],
       ['last beat', lb ? new Date(lb).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'never'],
       ['stored where', 'this browser only, in two localStorage keys. nothing leaves.'],
-      ['requests', 'google fonts for the type. cloudflare-dns.com, only when you press resolve on the dns station. nothing else.'],
+      ['requests', 'none by default. cloudflare-dns.com, only when you press resolve on the dns station. the type is hosted here.'],
       ['cookies', 'none'],
     ];
     list.replaceChildren(...rows.map(([k, v]) => { const li = document.createElement('li'); const b = document.createElement('b'); b.textContent = k; li.append(b, v); return li; }));

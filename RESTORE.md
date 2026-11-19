@@ -8,11 +8,11 @@ If you are reading this in 2050, or later, thank you for keeping it running.
 - **The second and a half.** The ending falls for exactly 1500 ms. A body falls about 11 m in that time, close to the height of the walls of Jerusalem in the story.
 - **Mostly dormant.** The page goes dark when left alone and wakes when touched. Making it always on breaks it.
 - **Hidden stations stay hidden.** They are found by tuning, not by a menu.
-- **Nothing phones home.** The only outside requests are the fonts and, only when someone presses resolve, one DNS question to 1.1.1.1.
+- **Nothing phones home.** The only outside request is one DNS question to 1.1.1.1, and only when someone presses resolve.
 
 ## What may change
 
-- **Fonts.** Fraunces and IBM Plex Mono, from Google Fonts. Host copies if the service is gone.
+- **Fonts.** Fraunces and IBM Plex Mono, self-hosted in `fonts/` under the SIL Open Font License.
 - **The DNS station.** It asks `cloudflare-dns.com` over DoH (RFC 8484). If that is gone, point it at any DoH resolver. If none exist, serve `data/dns-birds-fly.json`, a real capture from 18 November 2026, and say so on the page.
 - **Browsers.** The page uses ES modules, `<dialog>`, Web Audio, canvas 2D and the Web Animations API. Emulate an older browser rather than rewriting for a newer one.
 
