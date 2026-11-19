@@ -706,9 +706,24 @@ const tuner = (() => {
     el, id: el.id, f: Number(el.dataset.f), k: el.dataset.k, v: el.dataset.v, name: el.dataset.name, secret: 'secret' in el.dataset,
   })).sort((a, b) => a.f - b.f);
   const N = stations.length;
-  stations.forEach((s, i) => { s.pos = Math.round(60 + (i * 880) / (N - 1)); });
+  // the listed stations keep an even dial; hidden ones sit in the static between them,
+  // placed by frequency but never too close to a neighbour, with a narrower capture
+  const pub = stations.filter((s) => !s.secret);
+  pub.forEach((s, i) => { s.pos = Math.round(60 + (i * 880) / (pub.length - 1)); s.cap = 60; });
+  for (const s of stations.filter((x) => x.secret)) {
+    s.cap = 22;
+    const lo = [...pub].reverse().find((x) => x.f < s.f), hi = pub.find((x) => x.f > s.f);
+    if (!lo) { s.pos = Math.max(12, hi.pos - 42); continue; }
+    if (!hi) { s.pos = Math.min(988, lo.pos + 42); continue; }
+    const t = (Math.log10(s.f) - Math.log10(lo.f)) / (Math.log10(hi.f) - Math.log10(lo.f));
+    s.pos = Math.round(lo.pos + (hi.pos - lo.pos) * Math.min(0.68, Math.max(0.32, t)));
+  }
+  // two hidden stations in one gap: push them apart
+  const sec = stations.filter((x) => x.secret).sort((a, b) => a.pos - b.pos);
+  for (let i = 1; i < sec.length; i++) if (sec[i].pos - sec[i - 1].pos < 30) sec[i].pos = sec[i - 1].pos + 30;
+  stations.sort((a, b) => a.pos - b.pos);
   const byId = new Map(stations.map((s) => [s.id, s]));
-  const CAPTURE = 60;
+  const CAPTURE = 60; // listed stations; hidden ones use s.cap
   const LOCK = 6;
 
   const scale = $('#scale');
@@ -779,7 +794,7 @@ const tuner = (() => {
     const p = Number(dial.value);
     const s = nearest(p);
     const dist = Math.abs(s.pos - p);
-    const sig = clamp(1 - dist / CAPTURE, 0, 1);
+    const sig = clamp(1 - dist / s.cap, 0, 1);
     const isLocked = dist <= LOCK;
 
     {
@@ -804,7 +819,7 @@ const tuner = (() => {
 
     wire.staticLevel = isLocked ? 0 : 1 - sig;
     sound.levels(isLocked ? 0.1 : 1 - sig * 0.8, sig);
-    sound.het(dist, CAPTURE, LOCK);
+    sound.het(dist, s.cap, LOCK);
     if (sig > 0) sound.station(s.id);
     if (locked?.id !== 'gamma') dwell.textContent = '';
 
@@ -852,13 +867,13 @@ const tuner = (() => {
   dial.addEventListener('change', () => {
     const p = Number(dial.value);
     const s = nearest(p);
-    if (Math.abs(s.pos - p) <= CAPTURE * 0.6) glideTo(s.pos, 220);
+    if (Math.abs(s.pos - p) <= s.cap * 0.6) glideTo(s.pos, 220);
   });
   dial.addEventListener('keydown', (e) => {
     const map = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 };
     if (e.key in map) { e.preventDefault(); stepStation(map[e.key]); }
-    else if (e.key === 'Home') { e.preventDefault(); glideTo(stations[0].pos, 900); }
-    else if (e.key === 'End') { e.preventDefault(); glideTo(stations[N - 1].pos, 900); }
+    else if (e.key === 'Home') { e.preventDefault(); glideTo(pub[0].pos, 900); }
+    else if (e.key === 'End') { e.preventDefault(); glideTo(pub[pub.length - 1].pos, 900); }
   });
   presets.forEach((a) => a.addEventListener('click', (e) => {
     e.preventDefault();
@@ -1788,8 +1803,7 @@ const ending = (() => {
       if (r.bottom < 0 || r.top > H) { el.animate([{ opacity: 0 }, { opacity: 0 }], { duration: 10, fill: 'forwards' }); continue; }
       el.animate(fallKeys(H + 60, (Math.random() - 0.5) * 3), { duration: 1500, easing: 'linear', fill: 'forwards' });
     }
-    if (!rm && endingMode === 'flock') flock(fly);
-    else if (!rm) fly.animate([{ transform: 'translateY(0)' }, { transform: `translateY(${-Math.round(H * 0.18)}px)` }], { duration: 1500, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' });
+    if (!rm) fly.animate([{ transform: 'translateY(0)' }, { transform: `translateY(${-Math.round(H * 0.18)}px)` }], { duration: 1500, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' });
     // a second and a half, then nothing
     cutT.push(setTimeout(() => {
       dialog.classList.add('s-cut');
@@ -1804,7 +1818,6 @@ const ending = (() => {
     story.querySelectorAll('*').forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
     $('#bd-state').parentElement.getAnimations().forEach((a) => a.cancel());
     $('#bd-live').textContent = '';
-    fly.style.opacity = ''; dialog.querySelector('canvas.flock')?.remove();
     const was = ended; ended = false;
     return was;
   }
@@ -1888,56 +1901,6 @@ document.documentElement.classList.toggle('rm', reduceMotion.matches);
   });
 })();
 
-/* ---- T2: the flock ending (alternative to the rising line) ---- */
-let endingMode = 'rise';
-function flock(el, done) {
-  const r = el.getBoundingClientRect();
-  const cs = getComputedStyle(el);
-  const off = document.createElement('canvas');
-  off.width = Math.ceil(r.width) + 4; off.height = Math.ceil(r.height) + 4;
-  const og = off.getContext('2d');
-  og.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  og.textBaseline = 'middle'; og.fillStyle = '#000';
-  og.fillText(el.textContent, 2, off.height / 2 + 1);
-  const px = og.getImageData(0, 0, off.width, off.height).data;
-  const birds = [];
-  for (let y = 0; y < off.height; y += 2) for (let x = 0; x < off.width; x += 2) {
-    if (px[((y * off.width + x) << 2) + 3] > 110) birds.push({ x: r.left + x - 2, y: r.top + y - 2, vx: 0, vy: 0, ph: Math.random() * 6.28 });
-  }
-  const cv = document.createElement('canvas');
-  cv.className = 'flock'; cv.width = innerWidth; cv.height = innerHeight;
-  cv.setAttribute('aria-hidden', 'true');
-  dialog.append(cv);
-  const g = cv.getContext('2d');
-  el.style.opacity = '0'; // still in the accessibility tree
-  const t0 = performance.now(); let prev = t0;
-  const CELL = 28;
-  function step(now) {
-    const t = (now - t0) / 1000, dt = Math.min(0.033, (now - prev) / 1000); prev = now;
-    if (t > 1.5) { cv.remove(); done?.(); return; }
-    // one shared current per cell: neighbours align without an O(n²) search
-    const grid = new Map();
-    for (const b of birds) {
-      const k = ((b.x / CELL) | 0) + ',' + ((b.y / CELL) | 0);
-      const c = grid.get(k) || grid.set(k, { vx: 0, vy: 0, n: 0 }).get(k);
-      c.vx += b.vx; c.vy += b.vy; c.n++;
-    }
-    const lift = t < 0.18 ? 0 : 900 * Math.min(1, (t - 0.18) / 0.5);
-    g.clearRect(0, 0, cv.width, cv.height);
-    g.fillStyle = '#1d1410';
-    for (const b of birds) {
-      const c = grid.get(((b.x / CELL) | 0) + ',' + ((b.y / CELL) | 0));
-      const ax = (c.vx / c.n - b.vx) * 2.2 + Math.sin(t * 7 + b.ph) * 260 * (lift / 900);
-      const ay = (c.vy / c.n - b.vy) * 2.2 - lift + Math.cos(t * 9 + b.ph) * 120 * (lift / 900);
-      b.vx += ax * dt; b.vy += ay * dt;
-      b.x += b.vx * dt; b.y += b.vy * dt;
-      if (b.y > -4) g.fillRect(b.x, b.y, 2, 2);
-    }
-    requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
 /* ---- Y2: the anniversary of the chart (28 November, Israel time) ---- */
 const anniversary = (() => {
   const el = $('#lgm-anniv');
@@ -1963,11 +1926,10 @@ const dormantDay = (() => {
   }
   const span = document.querySelector('.dormant-msg > span');
   const wake = span?.textContent;
-  function enter() { deepDormant = true; setState('dormant'); if (span) span.textContent = 'not today.'; announce.textContent = 'Dormant for today. The contact details are still in the footer.'; }
-  function leave() { deepDormant = false; if (span) span.textContent = wake; setState('listening'); }
+  function enter() { deepDormant = true; document.body.classList.add('deep'); setState('dormant'); if (span) span.textContent = 'not today.'; announce.textContent = 'Dormant for today. The contact details are still in the footer.'; }
+  function leave() { deepDormant = false; document.body.classList.remove('deep'); if (span) span.textContent = wake; setState('listening'); }
   const { year, doy } = today();
-  const ENABLED = false; // Lev's call: when true, one unannounced day a year the site stays dormant
-  if (ENABLED && doy === dayFor(year)) enter();
+  if (doy === dayFor(year)) enter();
   return { enter, leave, dayFor };
 })();
 

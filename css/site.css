@@ -546,4 +546,8 @@ dialog#better-days::backdrop { background: #000; }
 .anniv { color: var(--soul) !important; font-family: var(--mono) !important; font-size: .8125rem !important; }
 .anniv-on #pulsar-trace { filter: hue-rotate(155deg) saturate(2.2); }
 .anniv-on .pulsar i { background: var(--soul); box-shadow: 0 0 10px var(--soul); }
-dialog#better-days canvas.flock { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 4; }
+
+/* the dormant day: everything sleeps except the way to reach Lev */
+body.deep .foot { opacity: .85 !important; }
+/* phones: the dial shows names; the readout above it already shows the frequency */
+@media (max-width: 899px) { .presets a span { display: none; } .js .presets { gap: .1rem 1rem; } }
