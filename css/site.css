@@ -551,3 +551,4 @@ dialog#better-days::backdrop { background: #000; }
 body.deep .foot { opacity: .85 !important; }
 /* phones: the dial shows names; the readout above it already shows the frequency */
 @media (max-width: 899px) { .presets a span { display: none; } .js .presets { gap: .1rem 1rem; } }
+.colonies { font: .75rem/1.5 var(--mono); color: var(--ink-mute); max-width: 44ch; margin-top: .75rem; }

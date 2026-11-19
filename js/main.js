@@ -493,16 +493,44 @@ const life = (() => {
       o.fillRect((p.x * w) | 0, (p.y * h) | 0, p.k === 0 ? 2 : 1, 1);
     }
   }
-  return { frame };
+  // rv32's heart pin: every beat from the firmware kicks the colonies and nudges one rule
+  function pulse() {
+    for (const p of P) { const a = rnd() * 6.283; p.vx += Math.cos(a) * 0.4; p.vy += Math.sin(a) * 0.4; }
+    const i = (rnd() * K) | 0, k = (rnd() * K) | 0;
+    M[i][k] = Math.max(-1, Math.min(1, M[i][k] + (rnd() - 0.5) * 0.5));
+  }
+  // roomsense's method, pointed at the static: occupied cells, joined into groups, counted
+  function count() {
+    const G = 24, cells = new Map();
+    for (const p of P) { const k = ((p.x * G) | 0) + ((p.y * G) | 0) * G; cells.set(k, (cells.get(k) || 0) + 1); }
+    const hot = new Set([...cells].filter(([, n]) => n >= 4).map(([k]) => k));
+    let groups = 0;
+    const seen = new Set();
+    for (const k of hot) {
+      if (seen.has(k)) continue;
+      groups++;
+      const stack = [k];
+      while (stack.length) {
+        const c = stack.pop();
+        if (seen.has(c) || !hot.has(c)) continue;
+        seen.add(c);
+        const x = c % G, y = (c / G) | 0;
+        stack.push(((x + 1) % G) + y * G, ((x + G - 1) % G) + y * G, x + ((y + 1) % G) * G, x + ((y + G - 1) % G) * G);
+      }
+    }
+    return groups;
+  }
+  return { frame, pulse, count };
 })();
 
 const wire = (() => {
   const host = $('.wires');
   const canvas = $('#wire');
-  const noop = { beat() {}, packet() {}, useStatic() {}, set staticLevel(v) {} };
+  const noop = { beat() {}, packet() {}, bytes() {}, useStatic() {}, set staticLevel(v) {} };
   if (!canvas?.getContext) return noop;
   const d = new Dither(canvas, 3);
   let packets = [];
+  let trains = []; // real bytes, one bit per pixel, riding the middle wire
   let plucks = [];
   let beatAt = -1;
   let visible = true;
@@ -557,6 +585,16 @@ const wire = (() => {
         const [x, y] = point(1, p.u, t, w, h, amp);
         o.beginPath(); o.arc(x, y, 1.4, 0, Math.PI * 2); o.fill();
       }
+      o.shadowBlur = 0;
+      for (const tr of trains) {
+        for (let k = 0; k < tr.bits.length; k++) {
+          const u = tr.u - k * tr.du;
+          if (u < 0 || u > 1) continue;
+          const [x, y] = point(1, tr.dir > 0 ? u : 1 - u, t, w, h, amp);
+          o.fillStyle = tr.bits[k] ? 'rgba(255,0,0,1)' : 'rgba(255,0,0,.22)';
+          o.fillRect(x | 0, (y | 0) - 1, 1, tr.bits[k] ? 3 : 1);
+        }
+      }
       if (staticLevel > 0.02) {
         o.shadowBlur = 0;
         if (real) {
@@ -606,6 +644,7 @@ const wire = (() => {
         nextPacket = t + (9000 - reserve * 70) * (0.5 + Math.random());
       }
       packets = packets.filter((p) => (p.u += p.v * dt) < 1);
+      trains = trains.filter((tr) => (tr.u += tr.v * dt) < 1 + tr.len);
       plucks = plucks.filter((p) => t - p.t0 < 3500);
       paint(t);
     }
@@ -658,6 +697,15 @@ const wire = (() => {
   return {
     useStatic(d) { real = d; },
     packet() { if (packets.length < 40) packets.push({ u: 0, v: 0.00034 }); start(); },
+    // a real packet: query goes out left to right, the answer comes back right to left
+    bytes(buf, dir = 1) {
+      if (reduceMotion.matches || !buf?.length) return;
+      const bits = [];
+      for (const b of buf.slice(0, 96)) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+      const du = 0.0021, len = bits.length * du;
+      trains.push({ bits, du, len, u: 0, v: (1 + len) / 1400, dir });
+      start();
+    },
     beat() { if (!reduceMotion.matches) beatAt = performance.now(); },
     set staticLevel(v) { staticLevel = v; if (reduceMotion.matches) paint(0); },
   };
@@ -1022,6 +1070,7 @@ document.addEventListener('visibilitychange', () => {
       if (!r.parsed.answers.length) for (const a of r.parsed.authority.slice(0, 2)) line(frag, span('dir', 'auth'), '    ', `${a.type} ${a.data}`);
       pre.replaceChildren(frag);
       cap.textContent = `Just now, to 1.1.1.1 over HTTPS, ${r.ms} ms.`;
+      wire.bytes(r.query.bytes, 1); setTimeout(() => wire.bytes(r.answer, -1), 900);
       verdict.textContent = r.parsed.rcode === 3 ? 'disagree' : 'agree';
     } catch (e) {
       cap.textContent = e instanceof TypeError ? 'Could not reach 1.1.1.1.' : e.message;
@@ -1259,7 +1308,7 @@ const mcu = (() => {
       if (off === 0) { out = (out + String.fromCharCode(v & 0xff)).slice(-800); }
       else if (off === 4) {
         const on = v & 1;
-        if (on && !gpio) { wire.beat(); sound.thump(); jolt(); }
+        if (on && !gpio) { wire.beat(); sound.thump(); jolt(); life.pulse(); }
         gpio = on;
       } else if (off === 8) {
         reserve = clamp(v | 0, 0, 100);
@@ -1931,6 +1980,17 @@ const dormantDay = (() => {
   const { year, doy } = today();
   if (doy === dayFor(year)) enter();
   return { enter, leave, dayFor };
+})();
+
+/* ---- roomsense, pointed at the static ---- */
+(() => {
+  const el = $('#colonies');
+  if (!el) return;
+  setInterval(() => {
+    if (tuner.lockedId() !== 'roomsense') return;
+    const n = life.count();
+    el.textContent = reduceMotion.matches ? '' : `Pointed at the static between stations, the same method counts ${n} colon${n === 1 ? 'y' : 'ies'}. Density, never identity.`;
+  }, 1500);
 })();
 
 /* ---- X1: what this radio can't receive ---- */
