@@ -556,3 +556,19 @@ body.deep .foot { opacity: .85 !important; }
 /* lab v2: P4, O5 */
 .hum-out { margin-top: 1.5rem; }
 .warm { margin: 0; color: var(--ink-mute); flex: 1 1 100%; }
+
+/* ---------- lab v3 ---------- */
+/* V3a: detuning type. Off-station, the serif loses its shape: softer, heavier, a teal ghost beside it. */
+.display { --detune: 0; }
+.display .station h1 { --opsz: 144; --w0: 340; }
+.display .station h1, .display .station h2 {
+  font-weight: calc(var(--w0, 360) + var(--detune) * 280);
+  font-variation-settings: "opsz" calc(var(--opsz, 96) - var(--detune) * 70), "SOFT" calc(30 + var(--detune) * 70), "WONK" 1;
+  text-shadow: calc(var(--detune) * .09em) 0 0 rgb(88 168 159 / calc(var(--detune) * .5));
+}
+/* V3b */
+.waterfall { display: block; width: calc(100% + var(--gutter) * 2); margin: .35rem calc(var(--gutter) * -1) 0; transition: opacity .6s; height: 34px; image-rendering: pixelated; image-rendering: crisp-edges; opacity: .8; }
+/* V3c */
+#tune-v { transition: opacity .06s linear; }
+#tune-v.cw-on { opacity: .3; }
+body[data-state="dormant"] .waterfall { opacity: 0; }

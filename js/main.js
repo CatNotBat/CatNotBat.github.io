@@ -365,6 +365,7 @@ const sound = (() => {
   });
   return {
     station, levels, geiger, toggle: () => btn.click(),
+    cw(sec) { if (on && !hushed) blip(600, sec, 0.035, 'sine'); },
     humOut(phones) { humPhones = phones; if (on && cur === 'hum') { stopVoice(); cur = null; station('hum'); } },
     risset(onOff) { if (onOff && on) rissetStart(); else if (!onOff) rissetStop(); },
     warm(w) { warm = w; if (on) master.gain.setTargetAtTime(masterLevel(), ctx.currentTime, 0.5); },
@@ -908,6 +909,7 @@ const tuner = (() => {
       }
       display.classList.toggle('static', sig === 0);
       scramble(shown, sig === 0 ? 0 : isLocked ? 0 : clamp((1 - sig) * 1.15, 0, 0.95));
+      display.style.setProperty('--detune', isLocked ? '0' : (1 - sig).toFixed(3)); // V3a: the type itself drifts out of tune
       shown.el.setAttribute('aria-hidden', String(!isLocked));
     }
 
@@ -2131,4 +2133,123 @@ const dormantDay = (() => {
     const po = new window.PressureObserver((recs) => { const st = recs.at(-1)?.state; set(st === 'serious' || st === 'critical'); });
     po.observe('cpu', { sampleInterval: 2000 }).catch(() => {});
   } catch { /* not allowed here */ }
+})();
+
+/* ================================================================== *
+ * Lab v3: the radio as an instrument you can see
+ * ================================================================== */
+const MORSE = { a: '.-', b: '-...', c: '-.-.', d: '-..', e: '.', f: '..-.', g: '--.', h: '....', i: '..', j: '.---', k: '-.-', l: '.-..', m: '--', n: '-.', o: '---', p: '.--.', q: '--.-', r: '.-.', s: '...', t: '-', u: '..-', v: '...-', w: '.--', x: '-..-', y: '-.--', z: '--..', 0: '-----', 1: '.----', 2: '..---', 3: '...--', 4: '....-', 5: '.....', 6: '-....', 7: '--...', 8: '---..', 9: '----.' };
+
+// V3b: a waterfall. Every SDR draws one: time runs down, frequency runs across. This one is
+// a record of you: the bright line is where you've had the needle, the faint ones are the
+// carriers you know about. Hidden stations only show once you've found them.
+(() => {
+  const dialEl = $('.dial');
+  if (!dialEl || reduceMotion.matches) return;
+  const cv = document.createElement('canvas');
+  cv.className = 'waterfall'; cv.setAttribute('aria-hidden', 'true');
+  ($('.presets') ?? dialEl).after(cv);
+  const d = new Dither(cv, 2);
+  const ROWS = 64;
+  let hist = [], raf = 0, last = 0, seen = true;
+  const carriers = () => {
+    let found = [];
+    try { found = JSON.parse(store.get('lk.found') || '[]'); } catch { /* none */ }
+    return [...tuner.byId.values()].filter((s) => !s.secret || found.includes(s.id)).map((s) => s.pos);
+  };
+  function row(w) {
+    const r = new Float32Array(w);
+    for (let x = 0; x < w; x++) r[x] = Math.random() < 0.06 ? Math.random() * 0.5 : 0;
+    for (const pos of carriers()) { const x = Math.round((pos / 1000) * (w - 1)); for (let k = -1; k <= 1; k++) if (r[x + k] !== undefined) r[x + k] = Math.max(r[x + k], k ? 0.3 : 0.75); }
+    if (state === 'listening') {
+      const x = Math.round((Number(dial.value) / 1000) * (w - 1));
+      const lock = tuner.lockedId() ? 2.2 : 1.6;
+      for (let k = -1; k <= 1; k++) if (r[x + k] !== undefined) r[x + k] = k ? lock * 0.55 : lock;
+    }
+    return r;
+  }
+  function frame(t) {
+    raf = 0;
+    if (!seen || document.hidden) return;
+    if (t - last > 140) {
+      last = t;
+      d.resize();
+      if (hist[0]?.length !== d.w) hist = [];
+      hist.unshift(row(d.w));
+      hist.length = Math.min(hist.length, Math.min(ROWS, d.h));
+      d.render((o, w, h) => {
+        hist.forEach((r, y) => {
+          const fade = 1 - y / h;
+          for (let x = 0; x < w; x++) if (r[x]) { o.fillStyle = `rgba(255,0,0,${r[x] * fade})`; o.fillRect(x, y, 1, 1); }
+        });
+      });
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  const go = () => { if (!raf) raf = requestAnimationFrame(frame); };
+  new IntersectionObserver(([e]) => { seen = e.isIntersecting; go(); }).observe(cv);
+  document.addEventListener('visibilitychange', go);
+  go();
+})();
+
+// V3c: CW idents. Real beacons say who they are in Morse. Hold a station for a moment and it
+// does too, slowly, on the readout (slow on purpose: well under three changes a
+// second). With sound on you also hear it at 600 Hz. Most send the operator's initials.
+// One sends something else.
+(() => {
+  const DIT = 360;
+  const IDENT = { hydrogen: 'fly' };
+  let timer = 0, steps = [], target = null, held = null;
+  function stop() { clearTimeout(timer); steps = []; target?.classList.remove('cw-on'); target = null; }
+  function play() {
+    const st = steps.shift();
+    if (!st) { stop(); return; }
+    target.classList.toggle('cw-on', st.on);
+    if (st.on) sound.cw?.(st.ms / 1000);
+    timer = setTimeout(play, st.ms);
+  }
+  function ident(id) {
+    stop();
+    const el = $('#tune-v');
+    if (!el || reduceMotion.matches && !sound.on) return;
+    target = reduceMotion.matches ? document.createElement('i') : el;
+    for (const w of (IDENT[id] ?? 'lk').split(' ')) {
+      for (const ch of w) {
+        for (const sym of MORSE[ch] ?? '') steps.push({ on: true, ms: sym === '.' ? DIT : DIT * 3 }, { on: false, ms: DIT });
+        steps.push({ on: false, ms: DIT * 2 });
+      }
+    }
+    play();
+  }
+  setInterval(() => {
+    const id = state === 'listening' && !dialog.open ? tuner.lockedId() : null;
+    if (id !== held?.id) { held = id ? { id, since: performance.now(), sent: false } : null; stop(); return; }
+    if (held && !held.sent && performance.now() - held.since > 1500) { held.sent = true; ident(id); }
+  }, 200);
+})();
+
+// V3d: the tab is part of the radio too. Leave, and its icon flatlines. Come back, and it
+// beats once, in the only red there is.
+(() => {
+  const link = document.querySelector('link[rel="icon"]');
+  if (!link) return;
+  const original = link.href;
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const g = c.getContext('2d');
+  function draw(points, color) {
+    g.clearRect(0, 0, 32, 32);
+    g.fillStyle = '#070b0f'; g.fillRect(0, 0, 32, 32);
+    g.strokeStyle = color; g.lineWidth = 2.5; g.lineJoin = 'round';
+    g.beginPath(); points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+    link.href = c.toDataURL('image/png');
+  }
+  const FLAT = [[2, 16], [30, 16]];
+  const BEAT = [[2, 17], [11, 17], [14, 20], [17, 5], [20, 25], [23, 17], [30, 17]];
+  let back = 0;
+  document.addEventListener('visibilitychange', () => {
+    clearTimeout(back);
+    if (document.hidden) { draw(FLAT, '#58a89f'); return; }
+    draw(BEAT, '#e5322d');
+    back = setTimeout(() => { link.href = original; }, 1400);
+  });
 })();
