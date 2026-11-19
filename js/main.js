@@ -1993,6 +1993,49 @@ const dormantDay = (() => {
   }, 1500);
 })();
 
+/* ---- X2: keep it near you (Document Picture-in-Picture, where it exists) ---- */
+(() => {
+  const btn = $('#near');
+  if (!btn || !('documentPictureInPicture' in window)) return;
+  btn.hidden = false;
+  let pip = null;
+  btn.addEventListener('click', async () => {
+    if (pip) { pip.close(); return; }
+    try { pip = await documentPictureInPicture.requestWindow({ width: 260, height: 120 }); } catch { return; }
+    const d = pip.document;
+    const s = (el, css) => { Object.assign(el.style, css); return el; };
+    s(d.body, { margin: '0', background: '#070b0f', color: '#c6d2cf', font: '12px ui-monospace, monospace', overflow: 'hidden', cursor: 'pointer' });
+    const cv = s(d.createElement('canvas'), { display: 'block', width: '100%', height: '78px' });
+    const label = s(d.createElement('p'), { margin: '6px 10px', color: '#7c8c89' });
+    d.body.append(cv, label);
+    const g = cv.getContext('2d');
+    let x = 0, beatAt = -1, lastState = '';
+    const wake = () => { if (state === 'dormant' && !deepDormant) { setState('listening'); beatAt = 0; } };
+    d.body.addEventListener('click', wake);
+    btn.textContent = 'bring it back';
+    function draw() {
+      if (!pip) return;
+      pip.requestAnimationFrame(draw);
+      const W = cv.width = cv.clientWidth, H = cv.height = 78;
+      if (state !== lastState) { lastState = state; if (state === 'listening') beatAt = 0; }
+      x = (x + 1.2) % W;
+      g.fillStyle = '#070b0f'; g.fillRect(0, 0, W, H);
+      g.strokeStyle = state === 'dormant' ? '#2c4044' : '#58a89f'; g.lineWidth = 1; g.beginPath();
+      for (let i = 0; i < W; i++) {
+        const age = beatAt >= 0 ? (x - i + W) % W : 1e9;
+        const spike = state === 'listening' && age < 40 && beatAt >= 0 ? [0, 3, -4, 22, -6, 0][Math.min(5, (age / 6) | 0)] : 0;
+        const y = H / 2 - spike + (state === 'listening' ? Math.sin((i + x) * 0.05) * 0.6 : 0);
+        i ? g.lineTo(i, y) : g.moveTo(i, y);
+      }
+      g.stroke();
+      if (beatAt >= 0 && ((x - 0 + W) % W) > W - 2) beatAt = -1;
+      label.textContent = state === 'dormant' ? 'dormant. click to wake it.' : `listening, ${$('#tune-v').textContent}`;
+    }
+    pip.requestAnimationFrame(draw);
+    pip.addEventListener('pagehide', () => { pip = null; btn.textContent = 'keep it near you'; });
+  });
+})();
+
 /* ---- X1: what this radio can't receive ---- */
 (() => {
   const el = $('#reach');
