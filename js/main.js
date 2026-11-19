@@ -164,6 +164,7 @@ const sound = (() => {
   const geiger = { alive: false, rate: 3 };
   let flatOsc = null, flatG = null, dawnNodes = null, hushed = false, hetO = null, hetG = null;
   let analyser = null, harmRaw = null, harmBufs = null, harmGains = null, harmKey = 0;
+  let humPhones = false, risset = null, warm = false;
 
   function init() {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -214,6 +215,47 @@ const sound = (() => {
     g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(peak, at + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, at + Math.max(0.08, dur * 0.95));
     o.connect(g); g.connect(voiceG); o.start(at); o.stop(at + dur + 0.05);
   }
+  /* P3. While it's dormant, a heart that is always speeding up and never arrives (Risset's
+   * eternal accelerando). Four layers an octave of tempo apart share one beat phase; as the
+   * tempo climbs, the fastest fades out and a new slowest fades in, and every 12 s the roles
+   * shift down by one. When the heart really restarts, it lets go. */
+  function rissetStart() {
+    if (risset || !ctx) return;
+    const L = 4, B = 30 / 60, T = 12, DT = 0.002;
+    const g = ctx.createGain(); g.gain.value = 0; g.connect(master);
+    g.gain.setTargetAtTime(1, ctx.currentTime, 0.8);
+    let t = ctx.currentTime + 0.05, p = 0, phi = 0;
+    const counts = Array.from({ length: L }, () => 0);
+    const thud = (at, k) => {
+      const amp = Math.sin((Math.PI * (k + p)) / L) ** 2 * 0.22;
+      if (amp < 0.004) return;
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 58;
+      const e = ctx.createGain(); e.gain.setValueAtTime(0, at); e.gain.linearRampToValueAtTime(amp, at + 0.008); e.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+      o.connect(e); e.connect(g); o.start(at); o.stop(at + 0.2);
+    };
+    const sched = () => {
+      while (t < ctx.currentTime + 0.12) {
+        phi += B * 2 ** p * DT;
+        p += DT / T;
+        if (p >= 1) { p -= 1; phi /= 2; for (let k = L - 1; k > 0; k--) counts[k] = counts[k - 1]; counts[0] = Math.floor(phi); }
+        for (let k = 0; k < L; k++) {
+          const n = Math.floor(2 ** k * phi);
+          if (n !== counts[k]) { counts[k] = n; thud(t, k); }
+        }
+        t += DT;
+      }
+    };
+    sched();
+    risset = { g, id: setInterval(sched, 40) };
+  }
+  function rissetStop() {
+    if (!risset) return;
+    const { g, id } = risset; risset = null;
+    clearInterval(id);
+    g.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    setTimeout(() => g.disconnect(), 400);
+  }
+  const masterLevel = () => (warm ? 0.3 : 0.5);
   function click() {
     const t = ctx.currentTime;
     const s = ctx.createBufferSource(); s.buffer = noiseBuf;
@@ -221,7 +263,13 @@ const sound = (() => {
     s.connect(gn); gn.connect(voiceG); s.start(t, Math.random()); s.stop(t + 0.02);
   }
   const voices = {
-    hum() { osc('sawtooth', 50, 0.05); osc('sine', 100, 0.07); osc('sine', 150, 0.03); },
+    // P4. Mains hum is mostly harmonics (the strongest is 100 Hz). Phone and laptop speakers can't
+    // make 50 Hz at all, so on a speaker only the harmonics play and the ear supplies the missing
+    // fundamental. With headphones the real 50 Hz comes back.
+    hum() {
+      if (humPhones) osc('sine', 50, 0.09);
+      [100, 150, 200, 250, 300, 350, 400].forEach((f, i) => osc('sine', f, 0.07 / (i + 1)));
+    },
     dns() { timers.push(setInterval(() => { blip(1200, 0.05); setTimeout(() => blip(1800, 0.08, 0.1), 170); }, 1600)); },
     harmonium() {
       // the real take, when there is one: what Discord carried and what came out, looped together
@@ -309,13 +357,17 @@ const sound = (() => {
     btn.setAttribute('aria-pressed', String(on));
     btn.textContent = on ? 'sound on' : 'sound off';
     if (on) {
-      ctx.resume(); master.gain.setTargetAtTime(0.5, ctx.currentTime, 0.1); cur = null; tuner.refresh();
+      ctx.resume(); master.gain.setTargetAtTime(masterLevel(), ctx.currentTime, 0.1); cur = null; tuner.refresh();
       decodeHarm().then(() => { if (cur === 'harmonium') { stopVoice(); cur = null; tuner.refresh(); } });
     }
-    else { master.gain.setTargetAtTime(0, ctx.currentTime, 0.05); stopVoice(); cur = null; }
+    else { master.gain.setTargetAtTime(0, ctx.currentTime, 0.05); stopVoice(); rissetStop(); cur = null; }
+    if (on && document.body.dataset.state === 'dormant') rissetStart();
   });
   return {
     station, levels, geiger, toggle: () => btn.click(),
+    humOut(phones) { humPhones = phones; if (on && cur === 'hum') { stopVoice(); cur = null; station('hum'); } },
+    risset(onOff) { if (onOff && on) rissetStart(); else if (!onOff) rissetStop(); },
+    warm(w) { warm = w; if (on) master.gain.setTargetAtTime(masterLevel(), ctx.currentTime, 0.5); },
     // the heterodyne: near a station you hear the beat between you and it, falling to nothing as you lock on
     het(dist, capture, lock) {
       if (!on || !hetG) return;
@@ -539,6 +591,7 @@ const wire = (() => {
   let nextPacket = 0;
   let staticLevel = 0;
   let real = null;
+  let frameMs = 33;
   const side = WIRES.map(() => 0);
 
   function disp(wi, u, t) {
@@ -609,7 +662,7 @@ const wire = (() => {
             o.fillRect(x, (Math.random() * h) | 0, 1, 1);
           }
         } else {
-          const n = staticLevel * w * h * 0.012;
+          const n = staticLevel * w * h * (frameMs > 33 ? 0.02 : 0.012);
           for (let i = 0; i < n; i++) {
             o.fillStyle = `rgba(255,0,0,${0.25 + Math.random() * 0.5})`;
             o.fillRect((Math.random() * w) | 0, (Math.random() * h) | 0, 1, 1);
@@ -636,7 +689,7 @@ const wire = (() => {
   function step(t) {
     raf = 0;
     if (!visible || document.hidden) return;
-    if (t - last >= 33) {
+    if (t - last >= frameMs) {
       const dt = Math.min(100, t - last);
       last = t;
       if (t > nextPacket) {
@@ -708,6 +761,7 @@ const wire = (() => {
     },
     beat() { if (!reduceMotion.matches) beatAt = performance.now(); },
     set staticLevel(v) { staticLevel = v; if (reduceMotion.matches) paint(0); },
+    set warm(w) { frameMs = w ? 120 : 33; },
   };
 })();
 
@@ -956,6 +1010,7 @@ function setState(s) {
   stateBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.state === s)));
   if (s === 'dormant') { announce.textContent = 'Dormant. Tap or press Escape to wake it.'; sound.levels(0.05, 0); dormantSince = performance.now(); }
   if (prev === 'dormant') tuner.update();
+  sound.risset(s === 'dormant');
 }
 stateBtns.forEach((b) => b.addEventListener('click', () => { if (!deepDormant) setState(b.dataset.state); }));
 // a tap anywhere wakes it (moving around only gathers); a short grace so the click that put it to sleep doesn't wake it
@@ -1522,6 +1577,7 @@ function openReveal(trigger) {
   dialog.className = '';
   bdState.textContent = 'reactivating';
   sound.hush(true);
+  sound.risset(false); // the heart really restarts: the illusion lets go
   dialog.showModal();
   ecg.resize();
   story.scrollTop = 0;
@@ -1553,6 +1609,7 @@ function openReveal(trigger) {
 }
 
 dialog.addEventListener('close', () => {
+  if (dialog.open) return; // reopened before this (async) close event arrived: don't undo the new reveal
   timers.forEach(clearTimeout);
   timers = [];
   cancelAnimationFrame(ecgRaf);
@@ -2042,4 +2099,36 @@ const dormantDay = (() => {
   if (!el) return;
   const n = unreachable.length;
   el.textContent = n ? `${n} station${n > 1 ? 's aren’t' : ' isn’t'} reachable on this radio. other radios can.` : 'this radio can reach every station.';
+})();
+
+/* ================================================================== *
+ * Lab v2 on v4: P4, O5
+ * ================================================================== */
+// P4: speaker or headphones. Can't be detected, so it's a choice.
+(() => {
+  const b = $('#hum-out');
+  if (!b) return;
+  b.hidden = false;
+  b.addEventListener('click', () => {
+    const phones = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', String(phones));
+    sound.humOut(phones);
+    if (!sound.on) sound.toggle();
+  });
+})();
+
+// O5: when the visitor's machine is working hard, the radio backs off. Chromium only.
+(() => {
+  if (!('PressureObserver' in window)) return;
+  const line = $('#warm');
+  const set = (hot) => {
+    if (line.hidden === !hot) return;
+    line.hidden = !hot;
+    wire.warm = hot;
+    sound.warm(hot);
+  };
+  try {
+    const po = new window.PressureObserver((recs) => { const st = recs.at(-1)?.state; set(st === 'serious' || st === 'critical'); });
+    po.observe('cpu', { sampleInterval: 2000 }).catch(() => {});
+  } catch { /* not allowed here */ }
 })();
