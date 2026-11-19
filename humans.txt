@@ -1,0 +1,14 @@
+/* TEAM */
+Made by: Lev Keret
+Where: Tel Aviv, where the wall hums at 50 Hz
+Code: https://github.com/CatNotBat
+
+/* THANKS */
+Jocelyn Bell Burnell, for reading the chart.
+The Voyager team, for still listening.
+Ann Druyan, for the heartbeat on the record.
+
+/* SITE */
+No build step. No trackers. No cookies.
+Type: Fraunces, IBM Plex Mono.
+Stations: more than the list admits.

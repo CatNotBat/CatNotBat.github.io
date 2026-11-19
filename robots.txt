@@ -1,0 +1,4 @@
+# a radio. most of its life it is dormant.
+# you're welcome to listen. you won't hear it either.
+User-agent: *
+Allow: /
