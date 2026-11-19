@@ -470,3 +470,80 @@ dialog#better-days::backdrop { background: #000; }
 .resolve input:focus-visible, .resolve select:focus-visible { outline: none; border-bottom-color: var(--trace); }
 .resolve .quiet-btn { margin-top: 0; }
 .resolve[aria-busy="true"] .quiet-btn { color: var(--trace); }
+
+/* ================= v4 additions (phase 1–2 + selected lab items) ================= */
+/* names on the dial */
+.presets a b { font-weight: 400; color: inherit; }
+.presets a span { color: var(--ink-mute); }
+.presets a[aria-current="true"] span { color: var(--trace); opacity: .7; }
+@media (min-width: 900px) {
+  .js .presets { height: 2.9rem; }
+  .js .presets a { text-align: center; line-height: 1.25; padding-top: .35rem; }
+  .js .presets a b, .js .presets a span { display: block; }
+  .js .presets a span { font-size: .625rem; }
+  .js .presets a[data-found]::after { position: absolute; top: .55rem; right: -.6rem; margin: 0; }
+}
+
+/* lgm-1 */
+.pulsar { position: relative; height: 4.5rem; max-width: 34em; margin: 1.5rem 0 1rem; border-bottom: 1px solid var(--line); }
+.pulsar canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pulsar i { position: absolute; left: 0; bottom: -4px; width: 7px; height: 7px; background: var(--trace); opacity: .25; }
+.pulsar i.on { opacity: 1; box-shadow: 0 0 10px var(--trace); }
+.st-text > p.prov.prov { font: 400 .75rem/1.5 var(--mono); color: var(--ink-mute); }
+#vgr-ago, #vgr-at { color: var(--trace); font-family: var(--mono); font-size: .85em; }
+
+/* footer: last beat, sunset, memory */
+.interval .lb { display: inline-block; margin-left: 1.5rem; color: var(--ink-faint); }
+.interval .lb span { color: var(--ink-dim); }
+.sunset { margin: 0; color: var(--ink-faint); }
+.sunset span { color: var(--ink-dim); }
+.memory { flex: 1 1 100%; color: var(--ink-mute); }
+.memory summary { cursor: pointer; padding: .5rem 0; min-height: 2.25rem; color: var(--ink-dim); list-style: none; }
+.memory summary::before { content: "+ "; color: var(--ink-faint); }
+.memory[open] summary::before { content: "− "; }
+.memory ul { list-style: none; margin: .25rem 0 .75rem; padding: 0; display: grid; gap: .35rem; max-width: 60ch; }
+.memory li b { font-weight: 400; color: var(--ink-dim); margin-right: .6em; }
+#forgot { color: var(--trace); margin-left: .6rem; }
+
+/* green horizon: once a day, at sunset in tel aviv, for a second and a half */
+.horizon-line { position: absolute; left: 0; right: 0; bottom: calc(1.1rem - 1px); height: 2px; background: #8af09a; opacity: 0; pointer-events: none; z-index: 1; }
+.horizon-line.on { animation: horizon 1.5s ease-in-out 1; }
+@keyframes horizon { 0% { opacity: 0; box-shadow: none; } 30%, 70% { opacity: 1; box-shadow: 0 0 18px 3px rgba(127, 224, 138, .75); } 100% { opacity: 0; box-shadow: none; } }
+
+/* cpr restart */
+.cpr-count { color: var(--trace) !important; min-height: 1.2em; }
+.cpr-card {
+  position: fixed; left: var(--gutter); right: var(--gutter); bottom: max(1.25rem, env(safe-area-inset-bottom)); z-index: 6;
+  max-width: 30rem; padding: 1rem 1.1rem; background: #0b1216; border: 1px solid var(--ink-faint); font-size: .8125rem; color: var(--ink);
+}
+.cpr-card p { margin: 0 0 .6rem; line-height: 1.5; }
+.cpr-card .cpr-k { color: var(--trace); }
+.cpr-card[hidden] { display: none; }
+
+/* the ending */
+#better-days .story .fly { display: inline-block; }
+#better-days.s-fall .story { overflow: hidden; }
+#better-days.s-fall .close { visibility: hidden; }
+#better-days.s-cut .dawn, #better-days.s-cut .story, #better-days.s-cut #ecg { opacity: 0 !important; transition: none !important; visibility: hidden; }
+#better-days.s-cut .bd-state { color: var(--ink-mute); }
+#better-days.s-cut #bd-state { color: var(--ink-dim); }
+#better-days.s-cut .close { visibility: visible; }
+
+
+/* ---- volume 3 ---- */
+.rdk { max-width: 300px; margin: 1.5rem 0 1rem; border: 1px solid var(--line); }
+.rdk canvas { display: block; width: 100%; aspect-ratio: 3 / 2; image-rendering: pixelated; image-rendering: crisp-edges; }
+.rdk-still { display: none; }
+.rm .rdk-still { display: block; }
+.ai-box { position: relative; z-index: 51; max-width: 300px; margin: 1.5rem 0 .75rem; background: #f6eee4; }
+.ai-box svg { display: block; width: 100%; }
+.ai-bird { fill: #00a58e; }
+.ai-dot { fill: #1d1410; }
+.ai-bar { height: 2px; background: #e6dccd; }
+.ai-bar i { display: block; height: 100%; width: 0; background: #1d1410; transition: width .25s linear; }
+.ai-msg { color: var(--trace); font: .75rem var(--mono); margin-left: .6rem; }
+.reach { margin: 0; color: var(--ink-faint); flex: 1 1 100%; }
+.anniv { color: var(--soul) !important; font-family: var(--mono) !important; font-size: .8125rem !important; }
+.anniv-on #pulsar-trace { filter: hue-rotate(155deg) saturate(2.2); }
+.anniv-on .pulsar i { background: var(--soul); box-shadow: 0 0 10px var(--soul); }
+dialog#better-days canvas.flock { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 4; }

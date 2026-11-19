@@ -13,6 +13,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
 };
 
+let deepDormant = false; // one unannounced day a year
 console.log('%cyou opened the console. hi.\nthere are more stations than the list admits.', 'color:#58a89f;font-family:monospace');
 
 /* ================================================================== *
@@ -241,6 +242,8 @@ const sound = (() => {
     },
     hydrogen() { osc('sine', 1420.405, 0.035); },
     home() { timers.push(setInterval(() => blip(2402, 0.025, 0.05, 'sine'), 2100)); },
+    // cp 1919: one click per measured period (1.3373 s)
+    lgm1() { timers.push(setInterval(() => blip(1400, 0.012, 0.22, 'square'), 1337.3)); },
     roomsense() {
       // room tone: barely there, the sound of a quiet room with radios in its corners
       const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
@@ -427,7 +430,8 @@ function feed(amount) {
     wire.beat();
     jolt();
     // enough has gathered: up at gamma, or while dormant, the heart restarts on its own
-    if (state === 'dormant' || tuner.lockedId() === 'gamma') setTimeout(() => openReveal(null), 600);
+    // the story stays an easter egg: only gamma, the signal button or typing 'fly' opens it
+    if (tuner.lockedId() === 'gamma') setTimeout(() => openReveal(null), 600);
   }
 }
 addEventListener('pointermove', (e) => {
@@ -458,6 +462,39 @@ const WIRES = [
   { a: [-0.01, 70 / 240], c: [0.48, 196 / 240], b: [1.01, 58 / 240], k: 1, glow: 9, n: 2 },
   { a: [-0.01, 104 / 240], c: [0.34, 172 / 240], b: [0.62, 126 / 240], k: 0.5, glow: 3, n: 1, cut: true },
 ];
+
+/* ---- volume 3, T4: particle life in the static, between stations ---- */
+const life = (() => {
+  const K = 3, N = 380, RMIN = 0.3, RMAX = 0.13, FRIC = 0.12; // tuned offline: clusters form in ~2.5 s, drift ~2 px a frame
+  // the rules change once a day, so the creatures are different tomorrow
+  let seed = Math.floor(Date.now() / 864e5) * 2654435761 >>> 0;
+  const rnd = () => ((seed = (Math.imul(seed ^ (seed >>> 15), 2246822519) + 0x9e3779b9) >>> 0) / 4294967296);
+  const M = Array.from({ length: K }, () => Array.from({ length: K }, () => rnd() * 2 - 1));
+  const P = Array.from({ length: N }, () => ({ x: rnd(), y: rnd(), vx: 0, vy: 0, k: (rnd() * K) | 0 }));
+  let prev = 0;
+  function force(r, a) { return r < RMIN ? r / RMIN - 1 : r < 1 ? a * (1 - Math.abs(2 * r - 1 - RMIN) / (1 - RMIN)) : 0; }
+  function frame(o, w, h, t, level) {
+    const dt = Math.min(0.05, prev ? (t - prev) / 1000 : 0.016); prev = t;
+    const ar = h / w;
+    for (const p of P) {
+      let fx = 0, fy = 0;
+      for (const q of P) {
+        if (p === q) continue;
+        let dx = q.x - p.x, dy = (q.y - p.y) * ar;
+        dx -= Math.round(dx); dy -= Math.round(dy / ar) * ar;
+        const r = Math.hypot(dx, dy);
+        if (r > 0 && r < RMAX) { const f = force(r / RMAX, M[p.k][q.k]) / r; fx += dx * f; fy += dy * f; }
+      }
+      p.vx = p.vx * (1 - FRIC) + fx * RMAX * 6 * dt; p.vy = p.vy * (1 - FRIC) + (fy / ar) * RMAX * 6 * dt;
+    }
+    for (const p of P) {
+      p.x = (p.x + p.vx * dt * 2 + 1) % 1; p.y = (p.y + p.vy * dt * 2 + 1) % 1;
+      o.fillStyle = `rgba(255,0,0,${Math.min(1, 0.5 + 0.8 * level) * (p.k === 0 ? 1 : 0.75)})`;
+      o.fillRect((p.x * w) | 0, (p.y * h) | 0, p.k === 0 ? 2 : 1, 1);
+    }
+  }
+  return { frame };
+})();
 
 const wire = (() => {
   const host = $('.wires');
@@ -541,6 +578,8 @@ const wire = (() => {
           }
         }
       }
+      // something lives in the static: a few hundred particles with rules about each other
+      if (staticLevel > 0.02 && !reduceMotion.matches) life.frame(o, w, h, t, staticLevel);
       if (beatAt >= 0) {
         const age = (t - beatAt) / 1400;
         if (age < 1) {
@@ -651,6 +690,16 @@ function fmtHz(f) {
   }
   return `${f.toFixed(2)} Hz`;
 }
+
+// some stations only exist on radios that can receive them
+const unreachable = [];
+document.querySelectorAll('.station[data-needs]').forEach((el) => {
+  const need = el.dataset.needs;
+  const ok = need === 'reduce' ? matchMedia('(prefers-reduced-motion: reduce)').matches
+    : need === 'webgpu' ? 'gpu' in navigator
+    : need === 'pip' ? 'documentPictureInPicture' in window : true;
+  if (!ok) { unreachable.push(el.dataset.name); el.remove(); }
+});
 
 const tuner = (() => {
   const stations = $$('.station[data-f]').map((el) => ({
@@ -845,14 +894,15 @@ function setState(s) {
   if (s === 'dormant') { announce.textContent = 'Dormant. Tap or press Escape to wake it.'; sound.levels(0.05, 0); dormantSince = performance.now(); }
   if (prev === 'dormant') tuner.update();
 }
-stateBtns.forEach((b) => b.addEventListener('click', () => setState(b.dataset.state)));
+stateBtns.forEach((b) => b.addEventListener('click', () => { if (!deepDormant) setState(b.dataset.state); }));
 // a tap anywhere wakes it (moving around only gathers); a short grace so the click that put it to sleep doesn't wake it
 let dormantSince = 0;
 addEventListener('pointerdown', (e) => {
-  if (state !== 'dormant' || performance.now() - dormantSince < 400 || e.target.closest('.r-state')) return;
-  setState('listening');
+  if (state !== 'dormant' || deepDormant || performance.now() - dormantSince < 400 || e.target.closest('.r-state')) return;
+  cpr.tap();
 });
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && state === 'dormant' && !dialog.open) setState('listening'); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && state === 'dormant' && !dialog.open && !deepDormant) setState('listening'); });
+addEventListener('keydown', (e) => { if (e.key === ' ' && state === 'dormant' && !dialog.open && !e.repeat && !deepDormant) { e.preventDefault(); if (performance.now() - dormantSince > 400) cpr.tap(); } });
 // leave it alone for a while and it does what it does most of its life: it dies, and waits
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
@@ -1527,3 +1577,404 @@ addEventListener('hashchange', () => {
   }
 })();
 
+
+/* ================================================================== *
+ * v4 additions (phase 1–2 + selected lab items)
+ * ================================================================== */
+const forget = (k) => { try { localStorage.removeItem(k); } catch { /* private mode */ } };
+const TZ = 'Asia/Jerusalem';
+const hhmm = (d, tz) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, ...(tz ? { timeZone: tz } : {}) }).format(d);
+
+/* ---- lgm-1: a chart recorder, one pulse per 1.3373 s ---- */
+(() => {
+  const P = 1337.3;
+  const dot = $('#pulsar-dot');
+  const cv = $('#pulsar-trace');
+  if (!cv) return;
+  const g = cv.getContext('2d');
+  const t0 = performance.now();
+  let raf = 0;
+  function draw(now) {
+    raf = requestAnimationFrame(draw);
+    if (tuner.lockedId() !== 'lgm1' || state !== 'listening') return;
+    const w = cv.clientWidth, h = cv.clientHeight, dpr = Math.min(2, devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    g.strokeStyle = '#58a89f'; g.lineWidth = 1; g.beginPath();
+    const speed = 0.06; // px per ms, like paper moving under the pen
+    const tNow = reduceMotion.matches ? t0 : now;
+    for (let x = 0; x <= w; x++) {
+      const t = tNow - (w - x) / speed;
+      const ph = (((t - t0) % P) + P) % P;
+      const pulse = Math.exp(-((ph - 40) ** 2) / 300);
+      const n = Math.sin(t * 0.37) * 0.6 + Math.sin(t * 0.113) * 0.8;
+      const y = h - 6 - n - pulse * (h - 16);
+      x ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.stroke();
+    const ph = (((now - t0) % P) + P) % P;
+    dot.classList.toggle('on', ph < 140);
+  }
+  raf = requestAnimationFrame(draw);
+})();
+
+/* ---- voyager 1: one light-day, crossed 18 Nov 2026 10:16:07 UTC ---- */
+(() => {
+  const CROSS = Date.UTC(2026, 10, 18, 10, 16, 7);
+  const ago = $('#vgr-ago'), at2 = $('#vgr-at');
+  function tick() {
+    const now = Date.now();
+    const d = now - CROSS;
+    if (d > 0) {
+      const h = Math.floor(d / 3.6e6), m = Math.floor((d % 3.6e6) / 6e4);
+      ago.textContent = `That was ${h > 47 ? `${Math.floor(h / 24)} days` : h >= 1 ? `${h} hours` : `${m} minutes`} ago.`;
+    }
+    // it recedes about 17 km/s, roughly 4.9 light-seconds a day
+    const lt = 86400 + 4.9 * Math.max(0, d / 864e5);
+    const arrive = new Date(now + lt * 1000);
+    at2.textContent = `around ${hhmm(arrive)} tomorrow, your time`;
+  }
+  tick(); setInterval(tick, 20000);
+})();
+
+/* ---- last beat (v4 1.4) ---- */
+function renderLastBeat2() {
+  const el = $('#last-beat');
+  const t = Number(store.get('lk.lastBeat'));
+  if (!t) { el.textContent = 'not yet'; return; }
+  const s = (Date.now() - t) / 1000;
+  el.textContent = s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)}m ago` : s < 86400 ? `${Math.round(s / 3600)}h ago` : `${Math.round(s / 86400)}d ago`;
+}
+renderLastBeat2(); setInterval(renderLastBeat2, 15000);
+
+/* ---- what this page remembers ---- */
+const memory = (() => {
+  const list = $('#mem-list');
+  function render() {
+    let found = [];
+    try { found = JSON.parse(store.get('lk.found') || '[]'); } catch { /* none */ }
+    const names = found.map((id) => tuner.byId.get(id)?.name).filter(Boolean);
+    const lb = Number(store.get('lk.lastBeat'));
+    const rows = [
+      ['stations found', names.length ? names.join(', ') : 'none yet'],
+      ['last beat', lb ? new Date(lb).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'never'],
+      ['stored where', 'this browser only, in two localStorage keys. nothing leaves.'],
+      ['requests', 'google fonts for the type. cloudflare-dns.com, only when you press resolve on the dns station. nothing else.'],
+      ['cookies', 'none'],
+    ];
+    list.replaceChildren(...rows.map(([k, v]) => { const li = document.createElement('li'); const b = document.createElement('b'); b.textContent = k; li.append(b, v); return li; }));
+  }
+  $('#memory').addEventListener('toggle', render);
+  $('#forget').addEventListener('click', () => {
+    forget('lk.found'); forget('lk.lastBeat');
+    $$('[data-preset]').forEach((a) => delete a.dataset.found);
+    render(); renderLastBeat2();
+    $('#forgot').textContent = 'forgotten.';
+    setTimeout(() => { $('#forgot').textContent = ''; }, 2400);
+  });
+  return { render };
+})();
+
+/* ---- four-minute heart (lab): four minutes of company fills the reserve ---- */
+const presence = (() => {
+  let ms = 0, last = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    if (!document.hidden && !dialog.open && state === 'listening') ms += now - last;
+    last = now;
+    if (ms >= 240000 && !charged && !dialog.open) { ms = 0; feed(100); }
+  }, 1000);
+  return { skip() { ms = 239000; } };
+})();
+
+/* ---- green horizon (lab L2): sunset in tel aviv, NOAA-style, -0.833° ---- */
+const horizon = (() => {
+  const LAT = 32.08, LON = 34.78, R = Math.PI / 180;
+  function sunsetOn(day) { // day: Date at local noon-ish; returns Date of sunset
+    const J = day.getTime() / 864e5 + 2440587.5;
+    const n = Math.ceil(J - 2451545.0 + 0.0008 - 0.5);
+    const Js = n - LON / 360;
+    const M = (357.5291 + 0.98560028 * Js) % 360;
+    const C = 1.9148 * Math.sin(M * R) + 0.02 * Math.sin(2 * M * R) + 0.0003 * Math.sin(3 * M * R);
+    const L = (M + C + 180 + 102.9372) % 360;
+    const Jt = 2451545.0 + Js + 0.0053 * Math.sin(M * R) - 0.0069 * Math.sin(2 * L * R);
+    const sd = Math.sin(L * R) * Math.sin(23.4397 * R);
+    const cd = Math.cos(Math.asin(sd));
+    const w0 = Math.acos((Math.sin(-0.833 * R) - Math.sin(LAT * R) * sd) / (Math.cos(LAT * R) * cd)) / R;
+    return new Date((Jt + w0 / 360 - 2440587.5) * 864e5);
+  }
+  function next(now = new Date()) {
+    let s = sunsetOn(now);
+    if (s < now) s = sunsetOn(new Date(now.getTime() + 864e5));
+    return s;
+  }
+  const line = $('#horizon-line');
+  const label = $('#sunset-at');
+  function flash() { line.classList.remove('on'); void line.offsetWidth; line.classList.add('on'); }
+  let target = next();
+  function tick() {
+    const now = new Date();
+    if (now >= target) { if (now - target < 120000 && !document.hidden) flash(); target = next(new Date(now.getTime() + 60000)); }
+    label.textContent = `${hhmm(target, TZ)}, israel time`;
+  }
+  tick(); setInterval(tick, 5000);
+  return { flash, next, sunsetOn };
+})();
+
+/* ---- cpr restart (lab O3): in dormant, rhythm restarts the heart ---- */
+const cpr = (() => {
+  const out = $('#cpr-count');
+  let taps = [], wakeT = 0, lastRate = 0;
+  function reset() { taps = []; out.textContent = ''; }
+  function tap() {
+    const t = performance.now();
+    clearTimeout(wakeT);
+    const prev = taps[taps.length - 1];
+    if (prev && (t - prev < 380 || t - prev > 900)) taps = [];
+    taps.push(t);
+    if (taps.length >= 3) {
+      const k = Math.min(10, taps.length);
+      const span = (taps[taps.length - 1] - taps[taps.length - k]) / (k - 1);
+      lastRate = Math.round(60000 / span);
+      out.textContent = `${taps.length} compressions, ${lastRate} a minute${lastRate < 100 ? ', faster' : lastRate > 120 ? ', slower' : ''}`;
+      if (taps.length >= 10 && lastRate >= 100 && lastRate <= 120) {
+        reset();
+        sound.thump(); wire.beat(); jolt();
+        setTimeout(() => { setState('listening'); $('#cpr-rate').textContent = String(lastRate); $('#cpr-card').hidden = false; }, 400);
+        return;
+      }
+    }
+    // a single tap still just wakes it, after a breath
+    wakeT = setTimeout(() => { if (state === 'dormant' && !dialog.open) { setState('listening'); reset(); } }, 950);
+  }
+  let restarted = 0;
+  return { tap, reset, takeRestart() { const r = restarted; restarted = 0; return r; } };
+})();
+$('#cpr-ok').addEventListener('click', () => { $('#cpr-card').hidden = true; });
+
+/* ---- the ending (v4 2.1–2.3 + lab L1): everything falls for 1.5 s, the line rises, then dormant ---- */
+const ending = (() => {
+  const last = story.querySelector('p.last');
+  const fly = story.querySelector('.fly');
+  let armed = false, ended = false, io = null, holdT = 0, cutT = [];
+  function arm() {
+    if (armed) return; armed = true;
+    io = new IntersectionObserver(([e]) => {
+      clearTimeout(holdT);
+      if (e.intersectionRatio >= 0.99 && !ended) holdT = setTimeout(go, 2200);
+    }, { root: story, threshold: [0, 0.99] });
+    io.observe(fly);
+  }
+  function fallKeys(dist, rot) {
+    const k = [];
+    for (let i = 0; i <= 15; i++) { const u = i / 15; k.push({ transform: `translateY(${(dist * u * u).toFixed(1)}px) rotate(${(rot * u * u).toFixed(2)}deg)`, opacity: u > 0.85 ? (1 - u) / 0.15 : 1 }); }
+    return k;
+  }
+  function go() {
+    if (ended || !dialog.open) return;
+    ended = true; io?.disconnect();
+    dialog.classList.add('s-fall');
+    const H = innerHeight;
+    const others = [...story.children].filter((el) => el !== last);
+    others.push(last.querySelector('.pre'), $('#bd-state').parentElement);
+    const pre = last.querySelector('.pre');
+    const rm = reduceMotion.matches;
+    for (const el of others) {
+      if (rm) { el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' }); continue; }
+      if (el === pre) { el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: 'ease-in', fill: 'forwards' }); continue; }
+      const r = el.getBoundingClientRect();
+      // off screen already: just gone. on screen: one gravity for everything, so nothing slides through anything else
+      if (r.bottom < 0 || r.top > H) { el.animate([{ opacity: 0 }, { opacity: 0 }], { duration: 10, fill: 'forwards' }); continue; }
+      el.animate(fallKeys(H + 60, (Math.random() - 0.5) * 3), { duration: 1500, easing: 'linear', fill: 'forwards' });
+    }
+    if (!rm && endingMode === 'flock') flock(fly);
+    else if (!rm) fly.animate([{ transform: 'translateY(0)' }, { transform: `translateY(${-Math.round(H * 0.18)}px)` }], { duration: 1500, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' });
+    // a second and a half, then nothing
+    cutT.push(setTimeout(() => {
+      dialog.classList.add('s-cut');
+      $('#bd-state').parentElement.getAnimations().forEach((a) => a.cancel());
+      bdState.textContent = '';
+      cutT.push(setTimeout(() => { bdState.textContent = 'dormant'; $('#bd-live').textContent = 'It fell. Dormant.'; $('#bd-close').focus({ preventScroll: true }); }, 800));
+    }, 1500));
+  }
+  function reset() {
+    clearTimeout(holdT); cutT.forEach(clearTimeout); cutT = [];
+    io?.disconnect(); io = null; armed = false;
+    story.querySelectorAll('*').forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
+    $('#bd-state').parentElement.getAnimations().forEach((a) => a.cancel());
+    $('#bd-live').textContent = '';
+    fly.style.opacity = ''; dialog.querySelector('canvas.flock')?.remove();
+    const was = ended; ended = false;
+    return was;
+  }
+  new MutationObserver(() => { if (dialog.classList.contains('s-story')) arm(); }).observe(dialog, { attributes: true, attributeFilter: ['class'] });
+  return { reset, go, get ended() { return ended; } };
+})();
+
+dialog.addEventListener('close', () => {
+  const wasEnded = ending.reset();
+  renderLastBeat2();
+  // it ended by falling: the page goes dormant, as the story did
+  if (wasEnded) setTimeout(() => setState('dormant'), 30);
+
+});
+
+/* ================================================================== *
+ * VOLUME 3 EXPERIMENTS
+ * ================================================================== */
+// a beakless bird: body, open wings, a stub of a tail, a round head with nothing on it
+const BIRD = 'M150 120 C132 118 110 100 64 58 C96 68 122 86 140 101 C143 95 157 95 160 101 C178 86 204 68 236 58 C190 100 168 118 150 120 Z M145 118 L137 146 L150 136 L163 146 L155 118 Z M142 95 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0 Z';
+
+/* ---- W1: a bird that exists only in coherent motion ---- */
+const rdk = (() => {
+  const cv = $('#rdk');
+  if (!cv) return null;
+  const W = 150, H = 100, S = 2; // 2 css px per cell
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const m = document.createElement('canvas'); m.width = W; m.height = H;
+  const mg = m.getContext('2d');
+  mg.scale(W / 300, H / 200); mg.fill(new Path2D(BIRD));
+  const md = mg.getImageData(0, 0, W, H).data;
+  const inside = (x, y) => md[(((y | 0) * W + (x | 0)) << 2) + 3] > 127;
+  const N = Math.round(W * H * 0.16);
+  const dots = Array.from({ length: N }, () => ({ x: Math.random() * W, y: Math.random() * H, life: (Math.random() * 12) | 0 }));
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+  let last = 0;
+  function still() {
+    g.fillStyle = '#070b0f'; g.fillRect(0, 0, W, H);
+    g.save(); g.scale(W / 300, H / 200); g.strokeStyle = 'rgba(88,168,159,.45)'; g.lineWidth = 2; g.stroke(new Path2D(BIRD)); g.restore();
+  }
+  function frame(t) {
+    requestAnimationFrame(frame);
+    if (tuner.lockedId() !== 'motion' || state !== 'listening') return;
+    if (reduceMotion.matches) { if (!cv.dataset.still) { cv.dataset.still = '1'; still(); } return; }
+    delete cv.dataset.still;
+    if (t - last < 33) return; // ~30 fps: each dot steps once per frame, no flashing area
+    last = t;
+    g.fillStyle = '#070b0f'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#3f6f69';
+    for (const d of dots) {
+      if (--d.life < 0) { d.x = Math.random() * W; d.y = Math.random() * H; d.life = 6 + ((Math.random() * 10) | 0); }
+      else if (inside(d.x, d.y)) { d.x += 1; }                       // the bird drifts right, together
+      else { const [dx, dy] = DIRS[(Math.random() * 8) | 0]; d.x = (d.x + dx + W) % W; d.y = (d.y + dy + H) % H; } // everything else wanders
+      g.fillRect(d.x | 0, d.y | 0, 1, 1);
+    }
+  }
+  requestAnimationFrame(frame);
+  return { inside, W, H };
+})();
+document.documentElement.classList.toggle('rm', reduceMotion.matches);
+
+/* ---- W2: an afterimage, the only copy is in your eye ---- */
+(() => {
+  const bird = $('#ai-bird');
+  if (!bird) return;
+  bird.setAttribute('d', BIRD);
+  const go = $('#ai-go'), bar = $('#ai-bar'), msg = $('#ai-msg');
+  let t0 = 0, iv = 0;
+  function reset() { clearInterval(iv); bird.style.opacity = '1'; bar.style.width = '0'; }
+  go.addEventListener('click', () => {
+    reset(); t0 = Date.now(); msg.textContent = 'look at the dot.'; go.textContent = 'again';
+    iv = setInterval(() => {
+      const s = (Date.now() - t0) / 1000;
+      bar.style.width = `${Math.min(100, s * 5)}%`;
+      if (s >= 20) {
+        clearInterval(iv); bird.style.opacity = '0'; msg.textContent = 'keep looking at the paper.';
+        setTimeout(() => { if (bird.style.opacity === '0') msg.textContent = 'that was the only copy.'; }, 7000);
+      }
+    }, 250);
+  });
+})();
+
+/* ---- T2: the flock ending (alternative to the rising line) ---- */
+let endingMode = 'rise';
+function flock(el, done) {
+  const r = el.getBoundingClientRect();
+  const cs = getComputedStyle(el);
+  const off = document.createElement('canvas');
+  off.width = Math.ceil(r.width) + 4; off.height = Math.ceil(r.height) + 4;
+  const og = off.getContext('2d');
+  og.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  og.textBaseline = 'middle'; og.fillStyle = '#000';
+  og.fillText(el.textContent, 2, off.height / 2 + 1);
+  const px = og.getImageData(0, 0, off.width, off.height).data;
+  const birds = [];
+  for (let y = 0; y < off.height; y += 2) for (let x = 0; x < off.width; x += 2) {
+    if (px[((y * off.width + x) << 2) + 3] > 110) birds.push({ x: r.left + x - 2, y: r.top + y - 2, vx: 0, vy: 0, ph: Math.random() * 6.28 });
+  }
+  const cv = document.createElement('canvas');
+  cv.className = 'flock'; cv.width = innerWidth; cv.height = innerHeight;
+  cv.setAttribute('aria-hidden', 'true');
+  dialog.append(cv);
+  const g = cv.getContext('2d');
+  el.style.opacity = '0'; // still in the accessibility tree
+  const t0 = performance.now(); let prev = t0;
+  const CELL = 28;
+  function step(now) {
+    const t = (now - t0) / 1000, dt = Math.min(0.033, (now - prev) / 1000); prev = now;
+    if (t > 1.5) { cv.remove(); done?.(); return; }
+    // one shared current per cell: neighbours align without an O(n²) search
+    const grid = new Map();
+    for (const b of birds) {
+      const k = ((b.x / CELL) | 0) + ',' + ((b.y / CELL) | 0);
+      const c = grid.get(k) || grid.set(k, { vx: 0, vy: 0, n: 0 }).get(k);
+      c.vx += b.vx; c.vy += b.vy; c.n++;
+    }
+    const lift = t < 0.18 ? 0 : 900 * Math.min(1, (t - 0.18) / 0.5);
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.fillStyle = '#1d1410';
+    for (const b of birds) {
+      const c = grid.get(((b.x / CELL) | 0) + ',' + ((b.y / CELL) | 0));
+      const ax = (c.vx / c.n - b.vx) * 2.2 + Math.sin(t * 7 + b.ph) * 260 * (lift / 900);
+      const ay = (c.vy / c.n - b.vy) * 2.2 - lift + Math.cos(t * 9 + b.ph) * 120 * (lift / 900);
+      b.vx += ax * dt; b.vy += ay * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.y > -4) g.fillRect(b.x, b.y, 2, 2);
+    }
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ---- Y2: the anniversary of the chart (28 November, Israel time) ---- */
+const anniversary = (() => {
+  const el = $('#lgm-anniv');
+  function check(force) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    const on = force || (p.month === '11' && p.day === '28');
+    if (!el) return;
+    el.hidden = !on;
+    el.textContent = on ? `${Number(p.year) - 1967} years ago today.` : '';
+    document.body.classList.toggle('anniv-on', on);
+  }
+  check(); setInterval(check, 60000);
+  return { force: () => check(true) };
+})();
+
+/* ---- Z2: one unannounced dormant day a year ---- */
+const dormantDay = (() => {
+  function dayFor(year) { let h = 2166136261; for (const c of `beakless-${year}`) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 365) + 1; }
+  function today() {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    const doy = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day) - Date.UTC(+p.year, 0, 0)) / 864e5);
+    return { year: +p.year, doy };
+  }
+  const span = document.querySelector('.dormant-msg > span');
+  const wake = span?.textContent;
+  function enter() { deepDormant = true; setState('dormant'); if (span) span.textContent = 'not today.'; announce.textContent = 'Dormant for today. The contact details are still in the footer.'; }
+  function leave() { deepDormant = false; if (span) span.textContent = wake; setState('listening'); }
+  const { year, doy } = today();
+  const ENABLED = false; // Lev's call: when true, one unannounced day a year the site stays dormant
+  if (ENABLED && doy === dayFor(year)) enter();
+  return { enter, leave, dayFor };
+})();
+
+/* ---- X1: what this radio can't receive ---- */
+(() => {
+  const el = $('#reach');
+  if (!el) return;
+  const n = unreachable.length;
+  el.textContent = n ? `${n} station${n > 1 ? 's aren’t' : ' isn’t'} reachable on this radio. other radios can.` : 'this radio can reach every station.';
+})();

@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cloudflare-dns.com; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Lev Keret</title>
 <meta name="description" content="Lev Keret's website is a radio. Turn the dial.">
@@ -53,20 +53,20 @@
       </svg>
       <canvas id="wire"></canvas>
     </div>
-    <div class="dial">
+    <div class="dial"><div class="horizon-line" id="horizon-line" aria-hidden="true"></div>
       <div class="scale" id="scale" aria-hidden="true"></div>
       <input type="range" id="dial" min="0" max="1000" step="1" value="500" aria-label="Tune the receiver">
     </div>
     <nav class="presets" aria-label="Stations">
-      <a href="#hum" data-preset="hum">50 Hz</a>
-      <a href="#dns" data-preset="dns">53</a>
-      <a href="#a440" data-preset="a440">440 Hz</a>
-      <a href="#harmonium" data-preset="harmonium">0.3–3.7 kHz</a>
-      <a href="#rv32" data-preset="rv32">160 MHz</a>
-      <a href="#home" data-preset="home">2.402 GHz</a>
-      <a href="#roomsense" data-preset="roomsense">24 GHz</a>
-      <a href="#mugs" data-preset="mugs">480 THz</a>
-      <a href="#gamma" data-preset="gamma">10&#185;&#8313; Hz</a>
+      <a href="#hum" data-preset="hum"><b>the hum</b> <span>50 Hz</span></a>
+      <a href="#dns" data-preset="dns"><b>dns</b> <span>53</span></a>
+      <a href="#a440" data-preset="a440"><b>a</b> <span>440 Hz</span></a>
+      <a href="#harmonium" data-preset="harmonium"><b>harmonium</b> <span>0.3–3.7 kHz</span></a>
+      <a href="#rv32" data-preset="rv32"><b>rv32</b> <span>160 MHz</span></a>
+      <a href="#home" data-preset="home"><b>home</b> <span>2.402 GHz</span></a>
+      <a href="#roomsense" data-preset="roomsense"><b>roomsense</b> <span>24 GHz</span></a>
+      <a href="#mugs" data-preset="mugs"><b>mugs</b> <span>480 THz</span></a>
+      <a href="#gamma" data-preset="gamma"><b>gamma</b> <span>10&#185;&#8313; Hz</span></a>
     </nav>
   </div>
 
@@ -255,6 +255,50 @@ thump:  .asciz "\n  thump\n\n"</pre>
       </div>
     </section>
 
+    <section class="station st-text st-hidden" id="lgm1" data-f="81.5e6" data-k="freq" data-v="81.5 MHz" data-name="lgm-1" data-secret aria-labelledby="lgm-h">
+      <p class="st-id"><span>81.5 MHz</span> cp 1919</p>
+      <h2 id="lgm-h">Little green men.</h2>
+      <p>28 November 1967. A chart recorder in Cambridge drew a pulse every 1.3373 seconds, and for a few weeks nobody could rule out that someone was sending it.</p>
+      <p>It was a neutron star, turning. It still is.</p>
+      <p class="anniv" id="lgm-anniv" hidden></p>
+      <div class="pulsar" aria-hidden="true"><i id="pulsar-dot"></i><canvas id="pulsar-trace"></canvas></div>
+      <p class="prov">a sonification of a measured period, not a recording. sound on to hear it.</p>
+    </section>
+
+    <section class="station st-text st-hidden" id="voyager" data-f="8.4e9" data-k="freq" data-v="8.4 GHz" data-name="voyager 1" data-secret aria-labelledby="vgr-h">
+      <p class="st-id"><span>8.4 GHz</span> voyager 1, downlink</p>
+      <h2 id="vgr-h">One light-day.</h2>
+      <p>On 18 November 2026, around 10:16 UTC, Voyager 1 got far enough that its signal takes a whole day to reach us. <span id="vgr-ago"></span></p>
+      <p>A beat sent from here now would get there <span id="vgr-at">a little over a day from now</span>.</p>
+      <p>The golden record it carries has a human heartbeat on it.</p>
+      <p class="prov">nothing is transmitted from this page. the numbers are approximate.</p>
+    </section>
+
+    <section class="station st-text st-hidden" id="motion" data-f="5.4e14" data-k="light" data-v="555 nm" data-name="persistence" data-secret aria-labelledby="mo-h">
+      <p class="st-id"><span>555 nm</span> where the eye is most sensitive</p>
+      <h2 id="mo-h">Only while it moves.</h2>
+      <p>There is a bird in this static. Any single frame of it is just noise, so a screenshot will not have it.</p>
+      <div class="rdk" aria-hidden="true"><canvas id="rdk"></canvas></div>
+      <p class="sr-only">A beakless bird, wings open, made only of dots that drift together through dots that don't.</p>
+      <p class="prov rdk-still">here, the bird is only visible while it moves. with reduced motion on, this is its outline.</p>
+    </section>
+
+    <section class="station st-text st-hidden" id="afterimage" data-f="4.3e14" data-k="light" data-v="700 nm" data-name="afterimage" data-secret aria-labelledby="ai-h">
+      <p class="st-id"><span>700 nm</span> afterimage</p>
+      <h2 id="ai-h">The only copy.</h2>
+      <p>Look at the small dot for 20 seconds without moving your eyes. Then the bird goes, and you keep looking at the paper.</p>
+      <div class="ai-box"><svg viewBox="0 0 300 200" id="ai-svg" aria-hidden="true"><path class="ai-bird" id="ai-bird" d=""/><circle class="ai-dot" cx="150" cy="104" r="2.2"/></svg><div class="ai-bar"><i id="ai-bar"></i></div></div>
+      <p><button type="button" class="quiet-btn" id="ai-go">start</button> <span class="ai-msg" id="ai-msg" role="status"></span></p>
+      <p class="prov">what you see after is a reddish bird. it's normal, it's in your eye, and it fades in a few seconds. nothing is stored.</p>
+    </section>
+
+    <section class="station st-text st-hidden" id="still" data-f="1e-3" data-k="freq" data-v="1 mHz" data-name="still" data-secret data-needs="reduce" aria-labelledby="still-h">
+      <p class="st-id"><span>1 mHz</span> one cycle every sixteen minutes</p>
+      <h2 id="still-h">A quiet station.</h2>
+      <p>Your radio asked for less motion, so it can hear this one. Most radios can't.</p>
+      <p>Nothing here moves. It's the hum, slowed until it stops.</p>
+    </section>
+
     <section class="station st-text st-hidden" id="hydrogen" data-f="1.420405e9" data-k="freq" data-v="1420.405 MHz" data-name="hydrogen line" data-secret aria-labelledby="h-h">
       <p class="st-id"><span>1420.405 MHz</span> the hydrogen line</p>
       <h2 id="h-h" class="sr-only">the hydrogen line</h2>
@@ -278,7 +322,7 @@ thump:  .asciz "\n  thump\n\n"</pre>
     </section>
 
   </div>
-  <p class="dormant-msg" aria-hidden="true">dormant. it spends most of its life like this.<span>tap to wake it</span></p>
+  <p class="dormant-msg" aria-hidden="true">dormant. it spends most of its life like this.<span>tap to wake it</span><span class="cpr-count" id="cpr-count"></span></p>
   <p class="sr-only" id="announce" aria-live="polite"></p>
 </main>
 
@@ -293,10 +337,24 @@ thump:  .asciz "\n  thump\n\n"</pre>
           <li><span class="k">code</span> <a href="https://github.com/CatNotBat" rel="noopener noreferrer">github.com/CatNotBat</a></li>
           <li><span class="k">work</span> <a href="https://www.linkedin.com/in/lev-keret" rel="noopener noreferrer">linkedin.com/in/lev-keret</a></li>
         </ul>
-  <p class="interval">reactivation interval 4m–13y</p>
+  <p class="interval">reactivation interval 4m–13y<span class="lb">last beat <span id="last-beat">not yet</span></span></p>
+  <p class="reach" id="reach"></p>
+  <p class="sunset">next sunset over tel aviv <span id="sunset-at">…</span></p>
+  <details class="memory" id="memory">
+    <summary>what this page remembers</summary>
+    <ul id="mem-list"></ul>
+    <button type="button" class="quiet-btn" id="forget">forget</button> <span id="forgot" role="status"></span>
+  </details>
   <button type="button" id="signal" class="signal" data-reveal aria-haspopup="dialog">signal: <span id="signal-state">dormant</span></button>
   <!-- handwriting signature goes here once Lev provides a sample -->
 </footer>
+
+<aside class="cpr-card" id="cpr-card" hidden aria-labelledby="cpr-h">
+  <p id="cpr-h" class="cpr-k">you restarted the radio at <span id="cpr-rate"></span> a minute.</p>
+  <p>for a person: call 101 (magen david adom, israel). push hard and fast in the center of the chest, 100 to 120 a minute, and don't stop until help takes over.</p>
+  <p>this is not training. take a course.</p>
+  <button type="button" class="quiet-btn" id="cpr-ok">ok</button>
+</aside>
 
 <dialog id="better-days" aria-labelledby="bd-title">
   <div class="dawn" aria-hidden="true"></div>
@@ -308,8 +366,9 @@ thump:  .asciz "\n  thump\n\n"</pre>
     <p>After the world underwent a nuclear holocaust most animals ceased to exist; the ones that didn't went through changes so drastic you couldn't even call them the same animal. The beakless green feather is an example of that. Its continuation of the green feather species is only by name and a couple of DNA mutations that tell us they are somewhat related, given that there is nothing green or feathered about the beakless. Its body works like a small atomic battery, turning the radiation from its surroundings into usable energy, and feathers would only hurt the efficiency of the process — so would eyes, ears, or any other sensory organs. Even today nobody knows how they communicated or mated; it feels as if they just appeared one day. Estimations are that their lifespan was about 300 years, but nobody knows for sure.</p>
     <p>The beakless's internal functions were a combination of several marvelous mechanics. One of its shticks was covering itself with water molecules placed so that the radiation splits them into hydrogen and peroxide, an order of higher potential energy, and then gathers them inwards — the new molecules small enough to seep through its flesh to the core, where they are mixed with bacteria that return them to their original form while the exothermic reaction feeds the body. Its heart stops itself when the hydrogen runs out, while keeping just enough charge to reactivate once enough has gathered again. This can happen anywhere between 4 minutes and 13 years apart, depending on how radioactive its surroundings are. Just like an electric automobile, it is speculated that it spends most of its lifespan dead.</p>
     <p>Eventually the radiation dropped low enough for things that resembled old life to begin forming. The last beakless green feather stood on the wall of Jerusalem.</p>
-    <p>It couldn't see the green horizon stretching — a biological miracle, a win of life over death — so it started its engine one last time. The lack of radioactivity made it dizzy, and as it fell from the wall, for a second and a half the beakless performed something that had no survival benefit, something it wasn't programmed to do: reminding the world, and itself, that it is a bird. And birds fly.</p>
+    <p class="last"><span class="pre">It couldn't see the green horizon stretching — a biological miracle, a win of life over death — so it started its engine one last time. The lack of radioactivity made it dizzy, and as it fell from the wall, for a second and a half the beakless performed something that had no survival benefit, something it wasn't programmed to do: reminding the world, and itself, that it is a bird. </span><span class="fly">And birds fly.</span></p>
   </article>
+  <p class="sr-only" id="bd-live" aria-live="polite"></p>
   <button type="button" class="close" id="bd-close">go dormant</button>
 </dialog>
 </body>
