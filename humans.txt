@@ -5,7 +5,6 @@ Code: https://github.com/CatNotBat
 
 /* THANKS */
 Jocelyn Bell Burnell, for reading the chart.
-The Voyager team, for still listening.
 Ann Druyan, for the heartbeat on the record.
 
 /* SITE */

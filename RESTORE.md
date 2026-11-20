@@ -21,11 +21,10 @@ If you are reading this in 2050, or later, thank you for keeping it running.
 - `data/harmonium-*.m4a` are real recordings of the harmonium project.
 - `data/dns-birds-fly.json` is a real capture.
 - `fw/beakless.S` is the firmware source shown on the 160 MHz station.
-- The sunset time, the Voyager light-day and the CP 1919 period are computed or measured, not invented.
+- The sunset time is computed, not invented.
 
 ## What is not
 
-- The pulsar click is a sonification of a measured period, not a recording.
 - The colonies in the static are a simulation, reseeded daily.
 
 ## One unannounced day a year

@@ -290,8 +290,6 @@ const sound = (() => {
     },
     hydrogen() { osc('sine', 1420.405, 0.035); },
     home() { timers.push(setInterval(() => blip(2402, 0.025, 0.05, 'sine'), 2100)); },
-    // cp 1919: one click per measured period (1.3373 s)
-    lgm1() { timers.push(setInterval(() => blip(1400, 0.012, 0.22, 'square'), 1337.3)); },
     roomsense() {
       // room tone: barely there, the sound of a quiet room with radios in its corners
       const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
@@ -1708,59 +1706,6 @@ const forget = (k) => { try { localStorage.removeItem(k); } catch { /* private m
 const TZ = 'Asia/Jerusalem';
 const hhmm = (d, tz) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, ...(tz ? { timeZone: tz } : {}) }).format(d);
 
-/* ---- lgm-1: a chart recorder, one pulse per 1.3373 s ---- */
-(() => {
-  const P = 1337.3;
-  const dot = $('#pulsar-dot');
-  const cv = $('#pulsar-trace');
-  if (!cv) return;
-  const g = cv.getContext('2d');
-  const t0 = performance.now();
-  let raf = 0;
-  function draw(now) {
-    raf = requestAnimationFrame(draw);
-    if (tuner.lockedId() !== 'lgm1' || state !== 'listening') return;
-    const w = cv.clientWidth, h = cv.clientHeight, dpr = Math.min(2, devicePixelRatio || 1);
-    if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.clearRect(0, 0, w, h);
-    g.strokeStyle = '#58a89f'; g.lineWidth = 1; g.beginPath();
-    const speed = 0.06; // px per ms, like paper moving under the pen
-    const tNow = reduceMotion.matches ? t0 : now;
-    for (let x = 0; x <= w; x++) {
-      const t = tNow - (w - x) / speed;
-      const ph = (((t - t0) % P) + P) % P;
-      const pulse = Math.exp(-((ph - 40) ** 2) / 300);
-      const n = Math.sin(t * 0.37) * 0.6 + Math.sin(t * 0.113) * 0.8;
-      const y = h - 6 - n - pulse * (h - 16);
-      x ? g.lineTo(x, y) : g.moveTo(x, y);
-    }
-    g.stroke();
-    const ph = (((now - t0) % P) + P) % P;
-    dot.classList.toggle('on', ph < 140);
-  }
-  raf = requestAnimationFrame(draw);
-})();
-
-/* ---- voyager 1: one light-day, crossed 18 Nov 2026 10:16:07 UTC ---- */
-(() => {
-  const CROSS = Date.UTC(2026, 10, 18, 10, 16, 7);
-  const ago = $('#vgr-ago'), at2 = $('#vgr-at');
-  function tick() {
-    const now = Date.now();
-    const d = now - CROSS;
-    if (d > 0) {
-      const h = Math.floor(d / 3.6e6), m = Math.floor((d % 3.6e6) / 6e4);
-      ago.textContent = `That was ${h > 47 ? `${Math.floor(h / 24)} days` : h >= 1 ? `${h} hours` : `${m} minutes`} ago.`;
-    }
-    // it recedes about 17 km/s, roughly 4.9 light-seconds a day
-    const lt = 86400 + 4.9 * Math.max(0, d / 864e5);
-    const arrive = new Date(now + lt * 1000);
-    at2.textContent = `around ${hhmm(arrive)} tomorrow, your time`;
-  }
-  tick(); setInterval(tick, 20000);
-})();
-
 /* ---- last beat (v4 1.4) ---- */
 function renderLastBeat2() {
   const el = $('#last-beat');
@@ -1987,42 +1932,6 @@ const rdk = (() => {
   return { inside, W, H };
 })();
 document.documentElement.classList.toggle('rm', reduceMotion.matches);
-
-/* ---- W2: an afterimage, the only copy is in your eye ---- */
-(() => {
-  const bird = $('#ai-bird');
-  if (!bird) return;
-  bird.setAttribute('d', BIRD);
-  const go = $('#ai-go'), bar = $('#ai-bar'), msg = $('#ai-msg');
-  let t0 = 0, iv = 0;
-  function reset() { clearInterval(iv); bird.style.opacity = '1'; bar.style.width = '0'; }
-  go.addEventListener('click', () => {
-    reset(); t0 = Date.now(); msg.textContent = 'look at the dot.'; go.textContent = 'again';
-    iv = setInterval(() => {
-      const s = (Date.now() - t0) / 1000;
-      bar.style.width = `${Math.min(100, s * 5)}%`;
-      if (s >= 20) {
-        clearInterval(iv); bird.style.opacity = '0'; msg.textContent = 'keep looking at the paper.';
-        setTimeout(() => { if (bird.style.opacity === '0') msg.textContent = 'that was the only copy.'; }, 7000);
-      }
-    }, 250);
-  });
-})();
-
-/* ---- Y2: the anniversary of the chart (28 November, Israel time) ---- */
-const anniversary = (() => {
-  const el = $('#lgm-anniv');
-  function check(force) {
-    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(new Date()).map((x) => [x.type, x.value]));
-    const on = force || (p.month === '11' && p.day === '28');
-    if (!el) return;
-    el.hidden = !on;
-    el.textContent = on ? `${Number(p.year) - 1967} years ago today.` : '';
-    document.body.classList.toggle('anniv-on', on);
-  }
-  check(); setInterval(check, 60000);
-  return { force: () => check(true) };
-})();
 
 /* ---- Z2: one unannounced dormant day a year ---- */
 const dormantDay = (() => {
