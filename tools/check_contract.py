@@ -7,7 +7,9 @@
 - the CSP in every page and in _headers allows nothing else
 - no plain email address or mailto: in the source
 """
-import pathlib, re, sys
+import pathlib
+import re
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 KEYS = {"lk.found", "lk.lastBeat"}
